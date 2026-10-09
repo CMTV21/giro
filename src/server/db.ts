@@ -50,6 +50,10 @@ async function connect(): Promise<Db> {
       tx: (fn) => sql.begin((t) => fn(inTx(run(t)))) as never,
     };
   }
+  if (process.env.VERCEL) {
+    // Serverless functions have no persistent disk, so the embedded database would lose data.
+    throw new Error("DATABASE_URL is not set. Add your Neon connection string in Vercel → Settings → Environment Variables, then redeploy.");
+  }
   const { PGlite } = await import("@electric-sql/pglite");
   const dir = process.env.PGLITE_DIR ?? ".data/pglite";
   const pg = dir === "memory://" ? new PGlite() : new PGlite(dir);
