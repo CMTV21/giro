@@ -42,11 +42,12 @@ export default function PrivacyPage() {
       <h2>4. Who we share it with</h2>
       <p>We use trusted service providers to run Giro. They may only use your information to provide their service to us:</p>
       <ul>
-        <li><strong>Vercel</strong>: website hosting.</li>
+        <li><strong>Vercel</strong>: website hosting, and anonymous visit statistics (pages viewed, referrer, country and device type) collected without cookies.</li>
         <li><strong>Neon</strong>: database hosting.</li>
         <li><strong>Anthropic</strong>: Giro AI, only when you use it.</li>
         <li><strong>Resend</strong>: sending account and invite emails.</li>
         <li><strong>Open-Meteo</strong> and <strong>Frankfurter</strong>: weather forecasts and exchange rates. We send only a city or location and currency codes, never your personal information.</li>
+        <li><strong>Wikipedia, Wikimedia Commons</strong> and <strong>OpenStreetMap</strong>: place history, photos, coordinates and map tiles. Our server looks up place names; map tiles load in your browser, so OpenStreetMap sees your IP address, as any website you visit would.</li>
       </ul>
       <p><strong>Travel partners.</strong> When you follow a booking link, you leave Giro for the partner&apos;s site (e.g. Booking.com, Expedia, Airbnb, Google Flights). The link includes your search details (destination, dates, party size, currency) and, for some partners, a click reference code, but not your name or email. The partner&apos;s own privacy policy applies from there.</p>
       <p><strong>Other members of your trips</strong> can see your name, votes and the expenses you add on those trips.</p>
