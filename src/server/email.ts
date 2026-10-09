@@ -1,11 +1,12 @@
 import "server-only";
+import { siteUrl } from "../lib/site.ts";
 
 /**
  * Transactional email via Resend's REST API (no SDK needed).
  *
  * - RESEND_API_KEY: required to send. Without it, development logs emails to the console and
  *   production reports "not configured" so the UI can offer a copyable link instead.
- * - EMAIL_FROM: e.g. "Giro <hello@yourdomain.com>" once your domain is verified in Resend.
+ * - EMAIL_FROM: e.g. "Giro <hello@girotrips.com>" once your domain is verified in Resend.
  *   Resend's shared test sender only delivers to your own Resend account address.
  */
 
@@ -13,17 +14,8 @@ const FROM = () => process.env.EMAIL_FROM?.trim() || "Giro <onboarding@resend.de
 
 export const emailConfigured = () => Boolean(process.env.RESEND_API_KEY?.trim());
 
-/**
- * Absolute base URL for links in emails. Never derived from the request's Host header, which an
- * attacker can spoof to poison password-reset links.
- */
-export function appUrl(): string {
-  const explicit = process.env.APP_URL?.trim().replace(/\/$/, "");
-  if (explicit) return explicit;
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel) return `https://${vercel}`;
-  return "http://localhost:3000";
-}
+/** Absolute base URL for links in emails (see `siteUrl`). */
+export const appUrl = siteUrl;
 
 export const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
