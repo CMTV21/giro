@@ -42,11 +42,16 @@ export async function fetchPlace(title: string, city: string, opts: LookupOption
     const search = parseSearch(await get(`https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=${encodeURIComponent(`${title} ${city}`)}`));
     const pick = pickWikiTitle(title, city, search);
     if (pick) {
-      const summary = parseSummary(await get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pick.replaceAll(" ", "_"))}`));
+      const raw = await get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pick.replaceAll(" ", "_"))}`);
+      const summary = parseSummary(raw);
       if (summary && nearCity(summary, cityPoint, dayTrip) && (!opts.strict || (summary.lat !== undefined && cityPoint))) info = summary;
+      if (summary && !summary.thumbnail) {
+        const r = raw as { thumbnail?: { source?: unknown }; originalimage?: { source?: unknown } };
+        console.warn("place photo skipped", { title: pick, thumbnail: r?.thumbnail?.source ?? null, original: r?.originalimage?.source ?? null, keys: Object.keys(r ?? {}) });
+      }
     }
-  } catch {
-    /* fall through to geocoding */
+  } catch (err) {
+    console.warn("wikipedia lookup failed", title, String(err));
   }
   if (info.thumbnail) {
     const file = commonsFile(info.thumbnail);
@@ -54,7 +59,8 @@ export async function fetchPlace(title: string, city: string, opts: LookupOption
     else {
       try {
         info.photo = parseCommonsCredit(await get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&prop=imageinfo&iiprop=extmetadata&iiextmetadatafilter=Artist%7CLicenseShortName&titles=${encodeURIComponent(file)}`), file);
-      } catch {
+      } catch (err) {
+        console.warn("commons credit lookup failed", file, String(err));
         info.photo = parseCommonsCredit(undefined, file);
       }
     }
@@ -87,6 +93,13 @@ export async function factsFromExtract(title: string, extract: string, client = 
   });
   if (message.stop_reason === "refusal") return [];
   return (message.parsed_output?.facts ?? []).map((f) => f.trim()).filter((f) => f.length > 10 && f.length < 300).slice(0, 3);
+}
+
+/** Facts are optional, so a failure shouldn't break the panel, but it must be visible in the logs. */
+function logFactsError(err: unknown): undefined {
+  if (err instanceof Anthropic.APIError) console.error("facts generation failed", err.status, err.message);
+  else console.error("facts generation failed", err);
+  return undefined;
 }
 
 interface Row {
@@ -134,14 +147,14 @@ export async function lookupPlace(title: string, city: string, opts: LookupOptio
   if (cached) {
     const info = fromRow(cached);
     if (wantFacts(info)) {
-      info.facts = (await factsFromExtract(info.title ?? title, info.extract!).catch(() => undefined)) ?? undefined;
+      info.facts = (await factsFromExtract(info.title ?? title, info.extract!).catch(logFactsError)) ?? undefined;
       if (info.facts) await db.query("update place_info set facts = $2::jsonb where key = $1", [key, JSON.stringify(info.facts)]);
     }
     return info;
   }
 
   const info = await fetchPlace(title, city, opts, get);
-  if (wantFacts(info)) info.facts = await factsFromExtract(info.title ?? title, info.extract!).catch(() => undefined);
+  if (wantFacts(info)) info.facts = await factsFromExtract(info.title ?? title, info.extract!).catch(logFactsError);
   await db.query(
     `insert into place_info (key, title, description, extract, url, thumbnail, lat, lon, facts, photo, source, fetched_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, now())
