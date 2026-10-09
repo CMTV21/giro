@@ -162,3 +162,15 @@ test("taste profile nudges what gets picked", async () => {
   assert.ok(count(tuned, "history") <= count(neutral, "history"));
   assert.ok(taste.weights.nightlife! > 0 && taste.weights.history! < 0);
 });
+
+test("share links drop booking references", async () => {
+  const { encodeTrip, decodeTrip } = await import("../src/lib/export.ts");
+  const trip = curateTrip(base);
+  trip.flights = [{ id: "f1", kind: "outbound", from: "YYZ", to: "LIS", departDate: "2026-05-10", departTime: "08:00", arriveDate: "2026-05-10", arriveTime: "20:00", confirmation: "SECRET1" }];
+  trip.stays[0].booking = { name: "Hotel", confirmation: "SECRET2", url: "https://example.com/booking/123" };
+  const back = (await decodeTrip(await encodeTrip(trip)))!;
+  assert.equal(back.flights![0].confirmation, undefined);
+  assert.equal(back.stays[0].booking!.confirmation, undefined);
+  assert.equal(back.stays[0].booking!.url, undefined);
+  assert.equal(back.stays[0].booking!.name, "Hotel");
+});

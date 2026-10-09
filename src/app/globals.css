@@ -124,3 +124,19 @@
   color: var(--color-brand-dark);
   text-decoration: underline;
 }
+
+/* Printable guide: one day per page, maps printed as-is. */
+@media print {
+  .guide-day + .guide-day {
+    break-before: page;
+  }
+  .leaflet-control-zoom {
+    display: none;
+  }
+  a[href^="http"]::after {
+    content: "";
+  }
+}
+.break-inside-avoid {
+  break-inside: avoid;
+}

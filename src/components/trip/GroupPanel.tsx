@@ -1,12 +1,14 @@
 "use client";
 
-import { ArrowRight, Check, Copy, LogOut, Plus, Trash2, UserMinus, Users, Wallet } from "lucide-react";
+import { ArrowRight, Check, Copy, LoaderCircle, LogOut, Paperclip, Plus, ScanText, Trash2, UserMinus, Users, Wallet } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { checkAI } from "@/lib/plan-client";
 import { CURRENCIES, formatLocal, isCurrency, type Currency } from "@/lib/currency";
 import { tripFx } from "@/lib/money";
 import { api, type TripBundle } from "@/lib/storage";
 import { useSession } from "../SessionProvider";
+import { shrinkImage } from "./BookingsPanel";
 
 export function GroupPanel({ bundle, onChanged, onSaveToAccount, onLeft }: { bundle: TripBundle; onChanged: () => void; onSaveToAccount: () => Promise<void>; onLeft: () => void }) {
   const { user } = useSession();
@@ -214,6 +216,11 @@ function Expenses({ bundle, onChanged }: { bundle: TripBundle; onChanged: () => 
               <div className="text-right">
                 <p className="font-semibold tabular-nums">{isCurrency(e.currency) ? formatLocal(e.amount, e.currency) : e.amount}</p>
                 {e.currency !== fx.currency && <p className="text-xs text-muted tabular-nums">≈ {local(e.amountUSD)}</p>}
+                {e.receiptIds?.map((rid, k) => (
+                  <a key={rid} href={`/api/trips/${tripId}/receipts/${encodeURIComponent(rid)}`} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-ink-soft underline">
+                    <Paperclip className="h-3 w-3" /> Receipt{k ? ` ${k + 1}` : ""}
+                  </a>
+                ))}
               </div>
               {(bundle.role === "owner" || e.createdBy === bundle.me || e.paidBy === bundle.me) && (
                 <button type="button" aria-label={`Delete ${e.description}`} onClick={() => remove(e.id)} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-sand hover:text-ink"><Trash2 className="h-4 w-4" /></button>
@@ -237,6 +244,49 @@ function ExpenseForm({ bundle, onDone }: { bundle: TripBundle; onDone: (saved: b
   const [among, setAmong] = useState<string[]>(bundle.members.map((m) => m.id));
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [receipt, setReceipt] = useState<{ id: string; name: string; preview?: string }>();
+  const [uploading, setUploading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [ai, setAi] = useState(false);
+  const tripPath = `/api/trips/${encodeURIComponent(bundle.trip.id)}`;
+
+  useEffect(() => {
+    checkAI().then(setAi);
+  }, []);
+  useEffect(() => () => { if (receipt?.preview) URL.revokeObjectURL(receipt.preview); }, [receipt]);
+
+  async function attach(file: File) {
+    setUploading(true);
+    setError(undefined);
+    try {
+      const blob = await shrinkImage(file);
+      const body = new FormData();
+      body.set("file", blob, file.name);
+      const res = await fetch(`${tripPath}/receipts`, { method: "POST", body });
+      const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+      if (!res.ok || !json.id) throw new Error(json.message ?? "Couldn't upload that file.");
+      setReceipt({ id: json.id, name: file.name, preview: blob.type.startsWith("image/") ? URL.createObjectURL(blob) : undefined });
+      if (ai) await scan(json.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't upload that file.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function scan(id: string) {
+    setScanning(true);
+    try {
+      const r = await api<{ merchant: string; total: number; currency: string; description: string }>(`${tripPath}/receipts/${encodeURIComponent(id)}/scan`, { method: "POST" });
+      if (r.total > 0) setAmount(String(r.total));
+      if (isCurrency(r.currency)) setCurrency(r.currency);
+      if (!description && (r.description || r.merchant)) setDescription((r.description || r.merchant).slice(0, 120));
+    } catch (err) {
+      setError(err instanceof Error ? `${err.message} You can fill it in by hand.` : "Couldn't read the receipt.");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   return (
     <form
@@ -248,7 +298,7 @@ function ExpenseForm({ bundle, onDone }: { bundle: TripBundle; onDone: (saved: b
         if (!among.length) return setError("Pick who it's split between.");
         setBusy(true);
         try {
-          await api(`/api/trips/${encodeURIComponent(bundle.trip.id)}/expenses`, { method: "POST", body: JSON.stringify({ description, amount: value, currency, paidBy, splitBetween: among }) });
+          await api(`/api/trips/${encodeURIComponent(bundle.trip.id)}/expenses`, { method: "POST", body: JSON.stringify({ description, amount: value, currency, paidBy, splitBetween: among, receiptId: receipt?.id }) });
           onDone(true);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Couldn't save that.");
@@ -256,6 +306,25 @@ function ExpenseForm({ bundle, onDone }: { bundle: TripBundle; onDone: (saved: b
         }
       }}
     >
+      <div className="flex flex-wrap items-center gap-2">
+        <label className={`btn-ghost cursor-pointer py-1.5 text-xs ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+          {uploading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+          {receipt ? "Replace receipt" : "Add receipt photo or PDF"}
+          <input type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) attach(f); }} />
+        </label>
+        {receipt && (
+          <span className="inline-flex items-center gap-2 text-xs text-ink-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {receipt.preview ? <img src={receipt.preview} alt="Receipt preview" className="h-10 w-10 rounded-md object-cover" /> : <Paperclip className="h-3.5 w-3.5" />}
+            <span className="max-w-32 truncate">{receipt.name}</span>
+          </span>
+        )}
+        {receipt && ai && (
+          <button type="button" className="btn-ghost py-1.5 text-xs" disabled={scanning} onClick={() => scan(receipt.id)}>
+            {scanning ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />} {scanning ? "Reading…" : "Read receipt"}
+          </button>
+        )}
+      </div>
       <input autoFocus className="field py-2" placeholder="What was it? e.g. Fado dinner" value={description} onChange={(e) => setDescription(e.target.value)} aria-label="Description" maxLength={120} />
       <div className="flex gap-2">
         <input className="field py-2" inputMode="decimal" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Amount" />

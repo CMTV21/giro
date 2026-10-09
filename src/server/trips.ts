@@ -7,6 +7,7 @@ import type { Trip } from "../lib/types.ts";
 import { newId, sha256 } from "./auth.ts";
 import { getDb, type Db } from "./db.ts";
 import { forbidden, HttpError, notFound } from "./errors.ts";
+import { attachReceipt, receiptIdsByExpense } from "./receipts.ts";
 
 export type Role = "owner" | "editor" | "viewer";
 const RANK: Record<Role, number> = { viewer: 0, editor: 1, owner: 2 };
@@ -36,6 +37,7 @@ export interface Expense {
   splitBetween: string[];
   createdBy: string;
   createdAt: string;
+  receiptIds?: string[];
 }
 
 export interface TripBundle {
@@ -139,6 +141,8 @@ export async function getTripBundle(tripId: string, userId: string): Promise<Tri
     if (v.user_id === userId) tally.mine = Number(v.value) > 0 ? 1 : -1;
   }
   const expenses = await listExpenses(db, tripId);
+  const receipts = await receiptIdsByExpense(tripId);
+  for (const e of expenses) if (receipts[e.id]) e.receiptIds = receipts[e.id];
   const net = balances(
     expenses.map((e) => ({ paidBy: e.paidBy, amount: e.amountUSD, splitBetween: e.splitBetween })),
     members.map((m) => m.id),
@@ -254,6 +258,7 @@ export interface ExpenseInput {
   currency: Currency;
   description: string;
   splitBetween: string[];
+  receiptId?: string;
 }
 
 export async function addExpense(tripId: string, userId: string, input: ExpenseInput, rates: Record<Currency, number> = FALLBACK_RATES): Promise<Expense> {
@@ -274,6 +279,7 @@ export async function addExpense(tripId: string, userId: string, input: ExpenseI
     "insert into expenses (id, trip_id, paid_by, amount, currency, amount_usd, description, split_between, created_by) values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)",
     [id, tripId, input.paidBy, amount, input.currency, amountUSD, input.description.trim().slice(0, 120) || "Expense", JSON.stringify(among), userId],
   );
+  if (input.receiptId) await attachReceipt(tripId, userId, input.receiptId, id);
   return { id, paidBy: input.paidBy, amount, currency: input.currency, amountUSD, description: input.description.trim().slice(0, 120) || "Expense", splitBetween: among, createdBy: userId, createdAt: new Date().toISOString() };
 }
 

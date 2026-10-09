@@ -93,4 +93,32 @@ export const MIGRATIONS: string[][] = [
     )`,
     `create index auth_tokens_user_idx on auth_tokens(user_id, purpose)`,
   ],
+  [
+    `create table place_info (
+      key text primary key,
+      title text,
+      description text,
+      extract text,
+      url text,
+      thumbnail text,
+      lat double precision,
+      lon double precision,
+      facts jsonb,
+      source text not null,
+      fetched_at timestamptz not null default now()
+    )`,
+    `create table receipts (
+      id text primary key,
+      trip_id text not null references trips(id) on delete cascade,
+      expense_id text references expenses(id) on delete cascade,
+      uploaded_by text not null references users(id) on delete cascade,
+      mime text not null,
+      size integer not null,
+      name text not null,
+      data bytea not null,
+      created_at timestamptz not null default now()
+    )`,
+    `create index receipts_trip_idx on receipts(trip_id)`,
+    `create index receipts_expense_idx on receipts(expense_id)`,
+  ],
 ];

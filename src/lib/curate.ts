@@ -169,7 +169,7 @@ function clampNights(req: TripRequest): number {
   return Math.min(Math.max(1, Number.isFinite(n) ? n : 1), MAX_TRIP_DAYS - 1);
 }
 
-const phrases = (s?: string) =>
+export const phrases = (s?: string) =>
   (s ?? "")
     .split(/[,;\n]/)
     .map((p) => p.trim().toLowerCase())
@@ -184,7 +184,7 @@ function matchesPhrase(act: CatalogActivity, list: string[]): boolean {
 /** Evening slots only take evening experiences; "any" means any daytime slot (parks and markets close). */
 const fitsSlot = (act: CatalogActivity, slot: Slot) => (slot === "evening" ? act.slot === "evening" : act.slot !== "evening");
 
-interface ScoreContext {
+export interface ScoreContext {
   req: TripRequest;
   must: string[];
   avoid: string[];
@@ -218,7 +218,7 @@ interface CityState {
   eatIndex: number;
 }
 
-function toActivity(act: CatalogActivity, slot: Slot): Activity {
+export function toActivity(act: CatalogActivity, slot: Slot): Activity {
   return {
     id: newId(),
     title: act.title,

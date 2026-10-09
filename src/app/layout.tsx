@@ -3,6 +3,7 @@ import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SessionProvider } from "@/components/SessionProvider";
 import { SiteHeader } from "@/components/SiteHeader";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });

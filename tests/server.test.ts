@@ -194,3 +194,44 @@ test("email templates escape user-provided text", async () => {
   assert.ok(!m.html.includes("<img"));
   assert.ok(m.html.includes("&lt;b&gt;Eve&lt;/b&gt;"));
 });
+
+test("place lookups are cached, including misses", async () => {
+  const { lookupPlace } = await import("../src/server/places.ts");
+  let calls = 0;
+  const fake = async (url: string) => {
+    calls++;
+    if (url.includes("list=search")) return { query: { search: [{ title: "Belém Tower" }] } };
+    if (url.includes("/page/summary/")) return { type: "standard", title: "Belém Tower", extract: "Belém Tower is a 16th-century fortification in Lisbon.", coordinates: { lat: 38.6916, lon: -9.216 } };
+    return [];
+  };
+  const a = await lookupPlace("Belém Tower", "Lisbon", false, fake);
+  assert.equal(a.source, "wikipedia");
+  const before = calls;
+  const b = await lookupPlace("Belém Tower", "Lisbon", false, fake);
+  assert.equal(calls, before, "served from cache");
+  assert.equal(b.title, "Belém Tower");
+  const miss = await lookupPlace("Nowhere special", "Lisbon", false, async () => ({ query: { search: [] } }));
+  assert.equal(miss.source, "none");
+});
+
+test("receipts: members only, type-checked by content, attached to expenses", async () => {
+  const { uploadReceipt, getReceipt } = await import("../src/server/receipts.ts");
+  const { sniffMime } = await import("../src/server/files.ts");
+  const owner = await signup({ email: "rcpt@example.com", password: "receipts are fun", name: "Rhi" });
+  const stranger = await signup({ email: "nope@example.com", password: "not on this trip", name: "No" });
+  const { trip } = await createTrip(owner.id, curateTrip(req));
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 0, 255, 128]);
+  assert.equal(sniffMime(jpeg), "image/jpeg");
+  assert.equal(sniffMime(new TextEncoder().encode("<svg onload=alert(1)>")), undefined);
+  assert.equal(sniffMime(new TextEncoder().encode("%PDF-1.7\n")), "application/pdf");
+
+  const { id } = await uploadReceipt(trip.id, owner.id, { bytes: jpeg, mime: "image/jpeg", name: "dinner.jpg" });
+  await assert.rejects(uploadReceipt(trip.id, stranger.id, { bytes: jpeg, mime: "image/jpeg", name: "x.jpg" }), status(403));
+  await assert.rejects(getReceipt(trip.id, stranger.id, id), status(403));
+  const back = await getReceipt(trip.id, owner.id, id);
+  assert.deepEqual([...back.bytes], [...jpeg], "bytes round-trip exactly");
+
+  const e = await addExpense(trip.id, owner.id, { paidBy: owner.id, amount: 42, currency: "CAD", description: "Dinner", splitBetween: [owner.id], receiptId: id }, { CAD: 1.4 } as never);
+  const bundle = await getTripBundle(trip.id, owner.id);
+  assert.deepEqual(bundle.expenses.find((x) => x.id === e.id)?.receiptIds, [id]);
+});

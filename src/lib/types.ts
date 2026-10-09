@@ -67,6 +67,43 @@ export interface Activity {
   booked?: boolean;
   /** Catalog key, used for swapping suggestions. */
   ref?: string;
+  /** Start time pinned by the traveller ("HH:MM"); otherwise the schedule engine picks one. */
+  start?: string;
+  /** Map position, when known (from Wikipedia or geocoding). */
+  place?: { lat: number; lon: number };
+}
+
+/** A flight the traveller has booked. Times are local wall-clock times at each airport. */
+export interface Flight {
+  id: string;
+  kind: "outbound" | "return" | "between";
+  airline?: string;
+  flightNumber?: string;
+  from: string;
+  to: string;
+  departDate: string; // YYYY-MM-DD
+  departTime: string; // HH:MM
+  arriveDate: string;
+  arriveTime: string;
+  confirmation?: string;
+}
+
+/** Where the traveller is actually staying for a leg. */
+export interface StayBooking {
+  name: string;
+  address?: string;
+  checkInTime?: string; // HH:MM
+  checkOutTime?: string;
+  confirmation?: string;
+  url?: string;
+  lat?: number;
+  lon?: number;
+}
+
+/** An idea waiting outside the schedule: moved out by a flight change, or saved for later. */
+export interface ParkedIdea extends Activity {
+  city: string;
+  reason?: string;
 }
 
 export interface Day {
@@ -85,6 +122,7 @@ export interface Stay {
   nights: number;
   area: string;
   why: string;
+  booking?: StayBooking;
 }
 
 export interface BudgetBreakdown {
@@ -116,4 +154,6 @@ export interface Trip {
   palette: [string, string];
   /** Packing-list items the traveller has ticked off. */
   packed?: string[];
+  flights?: Flight[];
+  parked?: ParkedIdea[];
 }

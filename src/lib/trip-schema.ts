@@ -24,6 +24,35 @@ const ActivitySchema = z.object({
   bookable: z.boolean().optional(),
   booked: z.boolean().optional(),
   ref: str(80).optional(),
+  start: z.string().regex(/^\d{1,2}:\d{2}$/).optional(),
+  place: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).optional(),
+});
+
+const time = z.string().regex(/^\d{1,2}:\d{2}$/);
+
+const FlightSchema = z.object({
+  id: str(40),
+  kind: z.enum(["outbound", "return", "between"]),
+  airline: str(80).optional(),
+  flightNumber: str(20).optional(),
+  from: str(80),
+  to: str(80),
+  departDate: date,
+  departTime: time,
+  arriveDate: date,
+  arriveTime: time,
+  confirmation: str(40).optional(),
+});
+
+const StayBookingSchema = z.object({
+  name: str(160),
+  address: str(300).optional(),
+  checkInTime: time.optional(),
+  checkOutTime: time.optional(),
+  confirmation: str(40).optional(),
+  url: z.string().url().max(500).refine((u) => /^https?:\/\//i.test(u), "Links must start with http(s)://").optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lon: z.number().min(-180).max(180).optional(),
 });
 
 const RequestSchema = z.object({
@@ -67,7 +96,7 @@ export const TripSchema = z.object({
     .min(1)
     .max(31),
   stays: z
-    .array(z.object({ city: str(80), checkIn: date, checkOut: date, nights: z.number().int().min(0).max(31), area: str(160), why: str(400) }))
+    .array(z.object({ city: str(80), checkIn: date, checkOut: date, nights: z.number().int().min(0).max(31), area: str(160), why: str(400), booking: StayBookingSchema.optional() }))
     .max(6),
   budget: z.object({ flights: usd, lodging: usd, food: usd, activities: usd, localTransport: usd, total: usd, perPerson: usd }),
   fx: z.object({ currency: z.enum(CURRENCIES), rate: z.number().positive().max(100_000), asOf: str(20), source: z.enum(["live", "fallback"]) }).optional(),
@@ -76,6 +105,8 @@ export const TripSchema = z.object({
   source: z.enum(["giro", "ai"]),
   palette: z.tuple([hex, hex]),
   packed: z.array(str(200)).max(60).optional(),
+  flights: z.array(FlightSchema).max(12).optional(),
+  parked: z.array(ActivitySchema.extend({ city: str(80), reason: str(200).optional() })).max(100).optional(),
 });
 
 export function parseTrip(value: unknown): Trip | undefined {

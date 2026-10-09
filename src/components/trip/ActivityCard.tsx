@@ -1,22 +1,29 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleCheck, Clock, ExternalLink, Lightbulb, MapPin, Shuffle, ThumbsDown, ThumbsUp, Ticket, Trash2 } from "lucide-react";
+import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pin, Shuffle, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, trackedHref } from "@/lib/booking";
-import type { VoteTally } from "@/lib/storage";
 import type { FxSnapshot } from "@/lib/currency";
 import { formatMoney } from "@/lib/currency";
+import { clock, fromMinutes } from "@/lib/schedule";
+import type { VoteTally } from "@/lib/storage";
 import type { Activity } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
 
-const SLOT_LABEL = { morning: "Morning", afternoon: "Afternoon", evening: "Evening" } as const;
+export interface ActivityTime {
+  start: number;
+  end: number;
+  pinned?: boolean;
+  conflict?: string;
+  overflow?: boolean;
+}
 
 export interface ActivityActions {
   onSwap?: () => void;
+  /** Takes the stop out of the plan and into Ideas, so nothing is lost. */
   onRemove: () => void;
-  onMove: (dir: -1 | 1) => void;
   onToggleBooked: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
+  onSetStart?: (hhmm: string | undefined) => void;
   /** Present on shared trips: the group's votes and a way to cast yours. */
   votes?: VoteTally;
   onVote?: (value: -1 | 0 | 1) => void;
@@ -24,7 +31,27 @@ export interface ActivityActions {
   readOnly?: boolean;
 }
 
-export function ActivityCard({ activity: a, city, fx, tripId, actions }: { activity: Activity; city: string; fx: FxSnapshot; tripId?: string; actions: ActivityActions }) {
+export function ActivityCard({
+  activity: a,
+  city,
+  fx,
+  tripId,
+  time,
+  handle,
+  extra,
+  actions,
+}: {
+  activity: Activity;
+  city: string;
+  fx: FxSnapshot;
+  tripId?: string;
+  time?: ActivityTime;
+  /** Drag handle (supplied by the sortable wrapper). */
+  handle?: React.ReactNode;
+  /** Extra content under the description, e.g. history and facts. */
+  extra?: React.ReactNode;
+  actions: ActivityActions;
+}) {
   const meta = CATEGORY_META[a.category] ?? CATEGORY_META.free;
   const Icon = meta.icon;
   const isTransit = a.category === "transit";
@@ -32,25 +59,65 @@ export function ActivityCard({ activity: a, city, fx, tripId, actions }: { activ
   const ticket = a.bookable ? experienceLinks(city, a.title, fx.currency)[0] : undefined;
   const ticketUrl = ticket ? trackedHref({ ...ticket, valueUSD: a.estCost }, tripId) : undefined;
   const v = actions.votes;
+  const [editingTime, setEditingTime] = useState(false);
 
   return (
-    <li className="group relative flex gap-4">
+    <div className="group relative flex gap-3 sm:gap-4">
       <div className="flex flex-col items-center">
         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${meta.tone}`}>
           <Icon className="h-[18px] w-[18px]" />
         </span>
-        <span className="mt-2 w-px flex-1 bg-line group-last:hidden" />
+        <span className="mt-2 w-px flex-1 bg-line" />
       </div>
-      <div className={`mb-5 flex-1 rounded-2xl border border-line bg-surface p-4 transition hover:shadow-card ${isFree ? "border-dashed bg-transparent" : ""}`}>
+      <div className={`mb-4 min-w-0 flex-1 rounded-2xl border bg-surface p-4 transition hover:shadow-card ${time?.overflow ? "border-amber-300" : "border-line"} ${isFree ? "border-dashed bg-transparent" : ""}`}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted">
-          <span className="font-semibold tracking-wide text-ink-soft uppercase">{SLOT_LABEL[a.slot]}</span>
-          {!isTransit && !isFree && <span>{meta.label}</span>}
-          {!isFree && (
-            <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>
+          {time ? (
+            editingTime && actions.onSetStart ? (
+              <span className="no-print inline-flex items-center gap-1.5">
+                <input
+                  type="time"
+                  autoFocus
+                  defaultValue={fromMinutes(time.start)}
+                  aria-label="Start time"
+                  className="rounded-lg border border-line px-2 py-1 text-xs text-ink"
+                  onKeyDown={(e) => e.key === "Escape" && setEditingTime(false)}
+                  onBlur={(e) => {
+                    if (e.target.value) actions.onSetStart!(e.target.value);
+                    setEditingTime(false);
+                  }}
+                />
+                {time.pinned && (
+                  <button type="button" className="font-semibold text-brand" onMouseDown={(e) => e.preventDefault()} onClick={() => { actions.onSetStart!(undefined); setEditingTime(false); }}>
+                    Auto
+                  </button>
+                )}
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={!actions.onSetStart || actions.readOnly}
+                onClick={() => setEditingTime(true)}
+                title={actions.onSetStart && !actions.readOnly ? "Change start time" : undefined}
+                className="inline-flex items-center gap-1 font-semibold tracking-wide text-ink-soft enabled:hover:text-ink"
+              >
+                {time.pinned && <Pin className="h-3 w-3 text-brand" />}
+                {clock(time.start)} – {clock(time.end)}
+              </button>
+            )
+          ) : (
+            <span className="font-semibold tracking-wide text-ink-soft uppercase">{a.slot}</span>
           )}
+          {!isTransit && !isFree && <span>{meta.label}</span>}
+          {!isFree && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>}
           {!isTransit && !isFree && <span>{a.estCost ? formatMoney(a.estCost, fx, { approx: true }) : "Free"}</span>}
           {a.booked && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Booked</span>}
+          {handle && !actions.readOnly && <span className="no-print ml-auto">{handle}</span>}
         </div>
+        {(time?.conflict || time?.overflow) && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
+            <TriangleAlert className="h-3.5 w-3.5" /> {time.conflict ?? "Runs past the end of the day, or past your flight cut-off."}
+          </p>
+        )}
         <h4 className="mt-1.5 text-[17px] leading-snug font-semibold">{a.title}</h4>
         <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>
         {a.tip && (
@@ -58,6 +125,7 @@ export function ActivityCard({ activity: a, city, fx, tripId, actions }: { activ
             <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand" /> {a.tip}
           </p>
         )}
+        {extra}
         <div className="no-print mt-3 flex flex-wrap items-center gap-1.5">
           {a.area && !isTransit && (
             <a href={mapsSearchUrl(`${isFree ? a.area : a.title}, ${city}`)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-sand">
@@ -79,18 +147,24 @@ export function ActivityCard({ activity: a, city, fx, tripId, actions }: { activ
               </button>
             </span>
           )}
-          {!actions.readOnly && <span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-            {a.bookable && (
-              <IconBtn label={a.booked ? "Mark as not booked" : "Mark as booked"} onClick={actions.onToggleBooked}><CircleCheck className={`h-4 w-4 ${a.booked ? "text-sea" : ""}`} /></IconBtn>
-            )}
-            {actions.onSwap && <IconBtn label="Swap for something else" onClick={actions.onSwap}><Shuffle className="h-4 w-4" /></IconBtn>}
-            <IconBtn label="Move earlier" disabled={!actions.canMoveUp} onClick={() => actions.onMove(-1)}><ChevronUp className="h-4 w-4" /></IconBtn>
-            <IconBtn label="Move later" disabled={!actions.canMoveDown} onClick={() => actions.onMove(1)}><ChevronDown className="h-4 w-4" /></IconBtn>
-            <IconBtn label="Remove" onClick={actions.onRemove}><Trash2 className="h-4 w-4" /></IconBtn>
-          </span>}
+          {!actions.readOnly && (
+            <span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+              {a.bookable && <IconBtn label={a.booked ? "Mark as not booked" : "Mark as booked"} onClick={actions.onToggleBooked}><CircleCheck className={`h-4 w-4 ${a.booked ? "text-sea" : ""}`} /></IconBtn>}
+              {actions.onSwap && <IconBtn label="Swap for something else" onClick={actions.onSwap}><Shuffle className="h-4 w-4" /></IconBtn>}
+              {!isTransit && <IconBtn label="Move to Ideas" onClick={actions.onRemove}><ArchiveRestore className="h-4 w-4" /></IconBtn>}
+            </span>
+          )}
         </div>
       </div>
-    </li>
+    </div>
+  );
+}
+
+export function DragHandle(props: React.ComponentProps<"button">) {
+  return (
+    <button type="button" aria-label="Drag to reorder" title="Drag to move" className="grid h-7 w-7 cursor-grab touch-none place-items-center rounded-full text-muted hover:bg-sand hover:text-ink active:cursor-grabbing" {...props}>
+      <GripVertical className="h-4 w-4" />
+    </button>
   );
 }
 

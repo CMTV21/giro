@@ -4,19 +4,22 @@ import { CalendarDays, Check, Copy, Link2, Pencil, Printer, RefreshCw, Sparkles,
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { curateTrip, recalcBudget } from "@/lib/curate";
-import { formatDate, formatRange } from "@/lib/dates";
+import { curateTrip } from "@/lib/curate";
+import { formatRange } from "@/lib/dates";
 import { downloadFile, encodeTrip, tripToICS, tripToText } from "@/lib/export";
 import { money, tripFx } from "@/lib/money";
 import { planTrip } from "@/lib/plan-client";
 import { api, ApiError, deleteTrip, fetchTrip, saveTrip, updateTrip, type TripBundle } from "@/lib/storage";
 import { loadTaste } from "@/lib/taste-client";
-import type { Day, Trip } from "@/lib/types";
+import type { Trip } from "@/lib/types";
 import { BUDGET_META, PACE_META } from "../meta";
 import { useSession } from "../SessionProvider";
 import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
-import { DayPlan } from "./DayPlan";
+import { BookingsPanel } from "./BookingsPanel";
+import { DayMapToggle } from "./DayMap";
+import { ItineraryBoard } from "./ItineraryBoard";
+import { PlaceFacts } from "./PlaceFacts";
 import { Avatar, GroupPanel } from "./GroupPanel";
 import { LivePanel } from "./LivePanel";
 import { PackingPanel } from "./PackingPanel";
@@ -69,6 +72,13 @@ export function TripView() {
   const [regenerating, setRegenerating] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [saveError, setSaveError] = useState<string>();
+  const [toast, setToast] = useState<string>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const flash = useCallback((m: string) => {
+    setToast(m);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(undefined), 7000);
+  }, []);
   const notice = search.get("notice");
 
   // Saves run one at a time so each uses the version returned by the previous one.
@@ -155,7 +165,6 @@ export function TripView() {
   const r = trip.request;
   const readOnly = bundle.role === "viewer";
   const shared = bundle.remote && bundle.members.length > 1;
-  const updateDay = (day: Day) => commit(recalcBudget({ ...trip, days: trip.days.map((d) => (d.index === day.index ? day : d)) }));
 
   async function regenerate() {
     setRegenerating(true);
@@ -240,7 +249,7 @@ export function TripView() {
             <HeroBtn onClick={() => downloadFile(`${slug(trip.title)}.ics`, tripToICS(trip), "text/calendar")}><CalendarDays className="h-4 w-4" /> Add to calendar</HeroBtn>
             <HeroBtn onClick={() => copy("link")}>{copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />} {copied === "link" ? "Link copied" : "Share copy"}</HeroBtn>
             <HeroBtn onClick={() => copy("text")}>{copied === "text" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied === "text" ? "Copied" : "Copy as text"}</HeroBtn>
-            <HeroBtn onClick={() => window.print()}><Printer className="h-4 w-4" /> Print / PDF</HeroBtn>
+            <Link href={`/trip/${trip.id}/guide`} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Printer className="h-4 w-4" /> Printable guide</Link>
             {!readOnly && <HeroBtn onClick={regenerate} disabled={regenerating}><RefreshCw className={`h-4 w-4 ${regenerating ? "animate-spin" : ""}`} /> {regenerating ? "Re-curating…" : "Regenerate"}</HeroBtn>}
             <Link href={editUrl(trip)} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Pencil className="h-4 w-4" /> {readOnly ? "Plan my own version" : "Edit details"}</Link>
             {bundle.role === "owner" && (
@@ -291,25 +300,25 @@ export function TripView() {
 
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         {tab === "itinerary" && (
-          <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
-            <nav aria-label="Days" className="no-print hidden lg:block">
-              <ol className="sticky top-36 space-y-1">
-                {trip.days.map((d) => (
-                  <li key={d.index}>
-                    <a href={`#day-${d.index + 1}`} className="block rounded-xl px-3 py-2 transition hover:bg-sand">
-                      <span className="block text-xs font-semibold text-muted">Day {d.index + 1} · {formatDate(d.date, { month: "short", day: "numeric" })}</span>
-                      <span className="block truncate text-sm font-medium">{d.theme}</span>
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </nav>
-            <div className="space-y-14">
-              <StaySummary trip={trip} />
-              {trip.days.map((d) => (
-                <DayPlan key={d.index} trip={trip} day={d} onChange={updateDay} readOnly={readOnly} votes={shared ? bundle.votes : undefined} onVote={shared ? vote : undefined} />
-              ))}
-            </div>
+          <div className="space-y-8">
+            <BookingsPanel
+              trip={trip}
+              readOnly={readOnly}
+              onChange={(c) => {
+                commit(c.trip);
+                if (c.message) flash(c.message);
+              }}
+            />
+            <ItineraryBoard
+              trip={trip}
+              readOnly={readOnly}
+              votes={shared ? bundle.votes : undefined}
+              onVote={shared ? vote : undefined}
+              onChange={commit}
+              onMessage={flash}
+              renderExtra={(a, city) => <PlaceFacts activity={a} city={city} />}
+              renderMap={(day, items) => <DayMapToggle trip={trip} day={day} items={items} />}
+            />
           </div>
         )}
         {tab === "live" && <LivePanel trip={trip} readOnly={readOnly} onChange={commit} />}
@@ -318,20 +327,12 @@ export function TripView() {
         {tab === "group" && <GroupPanel bundle={bundle} onChanged={load} onSaveToAccount={moveToAccount} onLeft={() => router.push("/trips")} />}
         {tab === "packing" && <PackingPanel trip={trip} onChange={commit} />}
       </div>
-    </div>
-  );
-}
-
-function StaySummary({ trip }: { trip: Trip }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {trip.stays.map((s) => (
-        <div key={s.city + s.checkIn} className="rounded-2xl border border-line bg-surface p-4">
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">Base · {s.nights} night{s.nights > 1 ? "s" : ""} in {s.city}</p>
-          <p className="mt-1 font-semibold">{s.area}</p>
-          <p className="mt-0.5 text-sm text-ink-soft">{s.why}</p>
+      {toast && (
+        <div role="status" className="no-print fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lift sm:bottom-6">
+          <span className="flex-1">{toast}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setToast(undefined)} className="font-semibold text-white/70 hover:text-white">✕</button>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -37,6 +37,7 @@ export interface Expense {
   splitBetween: string[];
   createdBy: string;
   createdAt: string;
+  receiptIds?: string[];
 }
 
 /** A trip as the trip page sees it: the document plus, for account trips, the group around it. */

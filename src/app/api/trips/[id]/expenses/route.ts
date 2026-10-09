@@ -11,6 +11,7 @@ const Schema = z.object({
   currency: z.enum(CURRENCIES),
   description: z.string().max(120),
   splitBetween: z.array(z.string().max(40)).min(1).max(50),
+  receiptId: z.string().max(40).optional(),
 });
 
 export const POST = route(async (request: Request, { params }: Ctx) => {

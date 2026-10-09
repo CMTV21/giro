@@ -1,7 +1,6 @@
 import { addDays, formatDate } from "./dates.ts";
-import type { Slot, Trip } from "./types.ts";
-
-const SLOT_START: Record<Slot, number> = { morning: 9, afternoon: 14, evening: 19 };
+import { scheduleDay } from "./schedule.ts";
+import type { Trip } from "./types.ts";
 
 const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
 
@@ -30,22 +29,22 @@ export function tripToICS(trip: Trip): string {
   }
 
   for (const day of trip.days) {
-    const used: Record<Slot, number> = { morning: 0, afternoon: 0, evening: 0 };
-    for (const act of day.activities) {
-      const startHour = SLOT_START[act.slot] + used[act.slot];
-      used[act.slot] += Math.ceil(act.durationHrs);
-      const endMinutes = Math.round(startHour * 60 + act.durationHrs * 60);
-      const endDay = endMinutes >= 24 * 60 ? addDays(day.date, 1) : day.date;
-      const em = endMinutes % (24 * 60);
+    for (const it of scheduleDay(trip, day)) {
+      if (it.kind === "meal") continue;
+      const startDay = it.start >= 24 * 60 ? addDays(day.date, 1) : day.date;
+      const endMin = Math.max(it.end, it.start + 15);
+      const endDay = endMin >= 24 * 60 ? addDays(day.date, 1) : day.date;
+      const a = it.activity;
+      const uid = a ? a.id : `flight-${day.date}-${it.start}`;
       lines.push(
         "BEGIN:VEVENT",
-        `UID:${trip.id}-${act.id}@giro`,
+        `UID:${trip.id}-${uid}@giro`,
         `DTSTAMP:${now}`,
-        `DTSTART:${stamp(day.date, Math.min(23, startHour))}`,
-        `DTEND:${stamp(endDay, Math.floor(em / 60), em % 60)}`,
-        `SUMMARY:${icsEscape(act.title)}`,
-        `DESCRIPTION:${icsEscape([act.description, act.tip ? `Tip: ${act.tip}` : ""].filter(Boolean).join("\n"))}`,
-        ...(act.area ? [`LOCATION:${icsEscape(`${act.area}, ${day.city}`)}`] : []),
+        `DTSTART:${stamp(startDay, Math.floor((it.start % 1440) / 60), it.start % 60)}`,
+        `DTEND:${stamp(endDay, Math.floor((endMin % 1440) / 60), endMin % 60)}`,
+        `SUMMARY:${icsEscape(it.kind === "flight" ? `✈ ${it.label}` : it.label)}`,
+        ...(a ? [`DESCRIPTION:${icsEscape([a.description, a.tip ? `Tip: ${a.tip}` : ""].filter(Boolean).join("\n"))}`] : []),
+        ...(a?.area ? [`LOCATION:${icsEscape(`${a.area}, ${day.city}`)}`] : []),
         "END:VEVENT",
       );
     }
@@ -96,7 +95,14 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
 }
 
 export async function encodeTrip(trip: Trip): Promise<string> {
-  const json = new TextEncoder().encode(JSON.stringify({ ...trip, packed: undefined }));
+  // Shared copies omit personal booking details (references, links) and private checklists.
+  const shareable: Trip = {
+    ...trip,
+    packed: undefined,
+    flights: trip.flights?.map(({ confirmation: _c, ...f }) => f),
+    stays: trip.stays.map((st) => (st.booking ? { ...st, booking: { ...st.booking, confirmation: undefined, url: undefined } } : st)),
+  };
+  const json = new TextEncoder().encode(JSON.stringify(shareable));
   return toB64Url(await pipe(json, new CompressionStream("deflate-raw")));
 }
 

@@ -14,13 +14,18 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Travel DNA**: learns from swaps, removals, bookings and votes |
 | | **Giro AI**: Claude researches any destination and hand-picks real places |
 | | **Partner revenue dashboard**: clicks, trip value and projected commission |
+| | **Flights & stays**: add booked flights and hotels (or import from a confirmation photo/PDF); days re-time around landings and departures |
+| | **Real clock times**: travel buffers, lunch and dinner, pinned start times, and an hour-by-hour timeline view |
+| | **Ideas**: drag attractions into any day; removed or displaced stops wait here instead of disappearing |
+| | **History & facts** for each stop (Wikipedia, attributed), **day maps**, and a **printable sightseeing guide** |
+| | **Receipts** on shared expenses, read by Claude to fill in the amount and currency |
 
 ## Quick start
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000. Data is stored in an embedded Postgres under .data/
-npm test           # 40 tests: engine, currency, catalog, auth, groups, split, clicks, live, discover
+npm test           # 60 tests: engine, currency, catalog, auth, groups, split, clicks, live, discover
 npm run typecheck
 npm run build && npm start
 ```
@@ -37,6 +42,7 @@ Configuration lives in `.env.local` (see `.env.example`). Everything is optional
 | `RESEND_API_KEY` | Sends password-reset, email-confirmation and invite emails via Resend. Without it, development prints emails to the console and production offers copyable invite links. |
 | `EMAIL_FROM` | Sender address once your domain is verified in Resend, e.g. `Giro <hello@yourdomain.com>`. |
 | `APP_URL` | Public address used in email links. Defaults to the Vercel production URL; it is never taken from request headers. |
+| `NEXT_PUBLIC_MAP_TILE_URL` / `NEXT_PUBLIC_MAP_ATTRIBUTION` | Map tiles for day maps and guides. Defaults to OpenStreetMap's public tiles, which are fine for light use; switch to a provider such as MapTiler or Stadia (free tiers) before heavy traffic. |
 | `CONTACT_EMAIL` | Privacy and legal contact shown on `/privacy`, `/terms` and `/affiliate-disclosure` (redeploy after changing). |
 
 ## Growing the city catalog
@@ -74,6 +80,8 @@ src/
 scripts/                catalog draft/promote pipeline
 tests/                  node:test suites (server tests run against in-memory Postgres)
 ```
+
+**Planner internals.** `lib/schedule.ts` turns each day into clock times and re-fits trips around flights (`fitToFlights`). `lib/plan-edit.ts` holds the drag-and-drop operations, `lib/ideas.ts` the per-city suggestions, `server/places.ts` the Wikipedia/OpenStreetMap lookups (cached in Postgres), `server/extract.ts` the Claude readers for confirmations and receipts, and `server/receipts.ts` receipt storage. Receipts are identified by their bytes, served only to trip members with `nosniff` and a sandboxing CSP, and capped at 4 MB. Phone photos are shrunk in the browser first.
 
 **Legal pages.** `/privacy` (written to PIPEDA principles), `/terms` and `/affiliate-disclosure` describe what Giro actually collects and does. They're a strong starting point, but have a Canadian lawyer review them before public launch.
 
