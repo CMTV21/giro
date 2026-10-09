@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  --color-ink: #0b1220;
+  --color-ink-soft: #334155;
+  --color-muted: #64748b;
+  --color-paper: #faf9f6;
+  --color-surface: #ffffff;
+  --color-line: #e8e5de;
+  --color-sand: #f3efe7;
+
+  --color-brand: #ff5a36;
+  --color-brand-dark: #e6401c;
+  --color-brand-soft: #fff1ec;
+  --color-sea: #0e7c7b;
+  --color-sea-soft: #e6f4f3;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
+
+  --shadow-card: 0 1px 2px rgb(11 18 32 / 0.04), 0 8px 24px -12px rgb(11 18 32 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(11 18 32 / 0.04), 0 24px 48px -20px rgb(11 18 32 / 0.25);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-brand-soft);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+  }
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-150 select-none disabled:pointer-events-none disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-white shadow-[0_8px_20px_-8px_rgb(255_90_54/0.7)] hover:bg-brand-dark active:scale-[0.98];
+}
+@utility btn-dark {
+  @apply btn bg-ink text-white hover:bg-ink-soft active:scale-[0.98];
+}
+@utility btn-ghost {
+  @apply btn border border-line bg-surface text-ink hover:border-ink/30 hover:bg-sand/60;
+}
+@utility card {
+  @apply rounded-2xl border border-line bg-surface shadow-card;
+}
+@utility field {
+  @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-[15px] text-ink placeholder:text-muted/70 transition outline-none focus:border-ink/40 focus:ring-4 focus:ring-brand/10;
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-semibold tracking-wide text-muted uppercase;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink-soft transition hover:border-ink/30 aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-white;
+}
+@utility eyebrow {
+  @apply text-xs font-semibold tracking-[0.18em] text-brand uppercase;
+}
+
+.bg-grain {
+  background-image: radial-gradient(rgb(11 18 32 / 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+@media print {
+  header, footer, .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}
