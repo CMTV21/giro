@@ -1,34 +1,41 @@
 # Giro roadmap & growth ideas
 
-Giro's wedge is **curation first, booking second**. Most competitors start from inventory (here are 4,000 hotels); Giro starts from the trip you'll actually have, and earns on every booking it routes. The ideas below build on that.
+Giro's wedge is **curation first, booking second**. Most competitors start from inventory; Giro starts from the trip you'll actually have, and earns on every booking it routes.
 
-## Near term: make the core loop sticky
+## Shipped
 
-1. **Accounts and cloud sync.** Replace `src/lib/storage.ts` with an API so trips follow you across devices. This unlocks everything below.
-2. **Live prices in the Book tab.** Integrate one flight API (Duffel or Amadeus) and Booking.com's Demand API so the budget uses real fares and rates instead of estimates.
-3. **Price-watch alerts.** "Tell me when flights to Lisbon drop under $600." This is a high-intent return trigger and a natural reason to collect email.
-4. **Maps view.** Plot each day's stops on a map, with drag-to-reorder and a "nearby" panel for swaps.
+- Curation engine over 26 hand-curated cities, plus any city via the generic planner or Giro AI
+- CAD-first multi-currency pricing with Canadian partner storefronts
+- Accounts with server-synced trips (Postgres)
+- Group trips: invite links, roles, voting, shared expenses with minimal settle-up
+- Discover: budget-first search across the catalog with distance-based fares from your home airport
+- Today (Giro Live): now/next, forecast, rain plan, running-late re-plan
+- Travel DNA taste profile that learns from behaviour and nudges curation
+- Commission tracking: `/go` click logging, sub-IDs, projected revenue dashboard
+- Catalog pipeline: AI draft → human review → promote, validated by schema tests
 
-## Differentiators: things TripHobo-style planners don't do well
+## Next: turn on revenue
 
-5. **Group trips that actually decide.** Share a draft with friends; everyone votes on stops, the itinerary resolves conflicts, and a built-in cost-split ledger (Splitwise-style) tracks who paid for what. Group trips mean larger baskets and viral invites.
-6. **"Where can I go for $2,000 in March?"** Reverse search: start from a budget, dates and interests, and get ranked destinations with full plans. The Explore page's scoring (`inspire()` in `curate.ts`) is the seed of this.
-7. **Giro Live, a day-of companion.** On the day, re-plan around reality: rain moves the indoor museum up, a late start shifts the afternoon, a sold-out ticket triggers a swap. This needs weather and opening-hours data plus Giro AI.
-8. **Trip DNA.** Learn from swaps, removals and bookings ("you always cut museums after 3pm", "you love food markets") so each new trip starts better. Over time this becomes the moat.
-9. **Points & miles mode.** Show when a fare is cheaper in points and which card or loyalty program to use. Travel-hacking audiences are vocal and loyal.
+1. **Join partner programs.** Booking.com, Expedia Group, GetYourGuide, Viator and Skyscanner (via Impact). Add the IDs to the environment; the dashboard flags missing ones.
+2. **Replace illustrative rates** in `src/lib/affiliates.ts` with contracted terms, and import partner payout reports to compare projected and actual commission per sub-ID.
+3. **Production database.** Point `DATABASE_URL` at managed Postgres (Neon or Supabase both have free tiers) and add daily backups.
+4. **Email.** Verification, password reset and group invites by email (e.g. Resend or Postmark). Today, invites are copy-paste links.
 
-## Revenue
+## Near term: retention
 
-| Stream | Notes |
-|---|---|
-| Affiliate commissions | Booking.com, Expedia Group, GetYourGuide, Viator, Skyscanner and Kayak all run partner programs. IDs are already wired in via `NEXT_PUBLIC_*` env vars. |
-| **Giro Plus** subscription | Unlimited Giro AI, price alerts, offline trip packs, group voting, Giro Live. |
-| Creator itineraries | Travel creators publish Giro trips and earn a share of booking commissions. This brings a content and SEO engine plus distribution. |
-| B2B / white-label | Planning engine for travel agents, corporate offsites, wedding planners and tourism boards. The engine and catalog are already headless. |
-| Sponsored experiences | Clearly labelled, opt-in placements from tour operators. Never inside the curated plan itself. |
+5. **Price-watch alerts.** "Tell me when Toronto to Lisbon drops under C$800." This needs a flight API (Duffel or Amadeus) and a scheduled job.
+6. **Live prices in the Book tab.** Swap estimates for real fares and nightly rates where APIs allow.
+7. **Group polish.** Real-time updates (server-sent events instead of 15-second polling), comments on stops, and "group picks" that rank stops by votes.
+8. **Maps view** with drag-to-reorder and walking times between stops.
 
-## Content & catalog
+## Differentiators
 
-- Grow the catalog from 14 cities toward the top 100 destinations, using Giro AI to draft entries and human editors to verify them.
+9. **Points & miles mode.** Aeroplan and WestJet Rewards first, for the Canadian market: show when a fare is cheaper in points.
+10. **Creator itineraries.** Travel creators publish Giro trips and earn a share of the booking commission, which brings content, SEO and distribution.
+11. **Giro Plus subscription.** Unlimited Giro AI, price alerts, offline trip packs, Giro Live notifications.
+12. **B2B / white-label.** The planning engine for travel agents, corporate offsites, wedding planners and tourism boards.
+
+## Catalog targets
+
+- 50 cities by drafting a few per day with `npm run catalog:draft` plus review, prioritising Canadian demand (Caribbean, Mexico, Europe, Japan).
 - Add opening hours, seasonal closures and neighbourhood coordinates so clustering uses real distances.
-- Localise currency (the engine currently estimates in USD).

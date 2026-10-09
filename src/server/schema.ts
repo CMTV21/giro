@@ -1,0 +1,84 @@
+/**
+ * Ordered, append-only migrations. Never edit a shipped entry; add a new one instead.
+ */
+export const MIGRATIONS: string[][] = [
+  [
+    `create table users (
+      id text primary key,
+      email text not null unique,
+      name text not null,
+      password_hash text not null,
+      home_currency text not null default 'CAD',
+      home_airport text not null default '',
+      taste jsonb,
+      created_at timestamptz not null default now()
+    )`,
+    `create table sessions (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      expires_at timestamptz not null,
+      created_at timestamptz not null default now()
+    )`,
+    `create index sessions_user_idx on sessions(user_id)`,
+    `create table auth_attempts (
+      key text not null,
+      at timestamptz not null default now()
+    )`,
+    `create index auth_attempts_key_idx on auth_attempts(key, at)`,
+    `create table trips (
+      id text primary key,
+      owner_id text not null references users(id) on delete cascade,
+      data jsonb not null,
+      version integer not null default 1,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create table trip_members (
+      trip_id text not null references trips(id) on delete cascade,
+      user_id text not null references users(id) on delete cascade,
+      role text not null check (role in ('owner', 'editor', 'viewer')),
+      joined_at timestamptz not null default now(),
+      primary key (trip_id, user_id)
+    )`,
+    `create index trip_members_user_idx on trip_members(user_id)`,
+    `create table trip_invites (
+      token_hash text primary key,
+      trip_id text not null references trips(id) on delete cascade,
+      role text not null check (role in ('editor', 'viewer')),
+      created_by text not null references users(id) on delete cascade,
+      expires_at timestamptz not null,
+      created_at timestamptz not null default now()
+    )`,
+    `create table votes (
+      trip_id text not null references trips(id) on delete cascade,
+      activity_id text not null,
+      user_id text not null references users(id) on delete cascade,
+      value smallint not null check (value in (-1, 1)),
+      primary key (trip_id, activity_id, user_id)
+    )`,
+    `create table expenses (
+      id text primary key,
+      trip_id text not null references trips(id) on delete cascade,
+      paid_by text not null references users(id) on delete cascade,
+      amount numeric(12, 2) not null check (amount > 0),
+      currency text not null,
+      amount_usd numeric(12, 2) not null,
+      description text not null,
+      split_between jsonb not null,
+      created_by text not null references users(id) on delete cascade,
+      created_at timestamptz not null default now()
+    )`,
+    `create index expenses_trip_idx on expenses(trip_id)`,
+    `create table clicks (
+      id text primary key,
+      user_id text references users(id) on delete set null,
+      trip_id text,
+      provider text not null,
+      kind text not null,
+      value_usd numeric(12, 2) not null default 0,
+      expected_commission_usd numeric(12, 4) not null default 0,
+      created_at timestamptz not null default now()
+    )`,
+    `create index clicks_created_idx on clicks(created_at)`,
+  ],
+];

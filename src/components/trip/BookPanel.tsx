@@ -1,17 +1,31 @@
 import { BedDouble, Car, ExternalLink, Plane, Ticket } from "lucide-react";
-import { experienceLinks, tripBookingLinks, type BookingLink } from "@/lib/booking";
+import { experienceLinks, trackedHref, tripBookingLinks, type BookingLink } from "@/lib/booking";
+import { money, tripFx } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
 import { resolveDestination } from "@/lib/curate";
 import type { Trip } from "@/lib/types";
 
+/** Nightly price caps (USD) passed to stay searches, converted to the trip currency. */
 const STAY_FILTER: Record<Trip["request"]["budgetTier"], number | undefined> = { shoestring: 150, comfort: 350, luxury: undefined };
 
 export function BookPanel({ trip }: { trip: Trip }) {
   const req = trip.request;
+  const fx = tripFx(trip);
+  const cap = STAY_FILTER[req.budgetTier];
+  const totalNights = trip.stays.reduce((n, s) => n + s.nights, 0) || 1;
   const links = tripBookingLinks(
-    req,
-    trip.stays.map((s) => ({ city: s.city, checkIn: s.checkIn, checkOut: s.checkOut, maxNightly: STAY_FILTER[req.budgetTier] })),
+    { ...req, currency: fx.currency },
+    trip.stays.map((s) => ({
+      city: s.city,
+      checkIn: s.checkIn,
+      checkOut: s.checkOut,
+      maxNightly: cap ? cap * fx.rate : undefined,
+      lodgingUSD: (trip.budget.lodging * s.nights) / totalNights,
+    })),
+    trip.budget.flights,
   );
+  const people = req.adults + req.children * 0.5;
+  const go = (l: BookingLink) => trackedHref(l, trip.id);
   const bookable = trip.days.flatMap((d) => d.activities.filter((a) => a.bookable).map((a) => ({ ...a, city: d.city, date: d.date })));
 
   return (
@@ -21,7 +35,7 @@ export function BookPanel({ trip }: { trip: Trip }) {
           links.flights.map((g) => (
             <div key={g.title} className="space-y-3">
               <p className="text-sm font-semibold text-ink-soft">{g.title}</p>
-              <LinkGrid links={g.links} />
+              <LinkGrid links={g.links} go={go} />
             </div>
           ))
         ) : (
@@ -43,7 +57,7 @@ export function BookPanel({ trip }: { trip: Trip }) {
                   <span className="font-semibold text-sea">Stay in {stay.area}.</span> {stay.why}
                 </p>
               )}
-              <LinkGrid links={stay ? leg.links.map((l) => ({ ...l, url: withArea(l, stay.area, leg.city) })) : leg.links} />
+              <LinkGrid go={go} links={stay ? leg.links.map((l) => ({ ...l, url: withArea(l, stay.area, leg.city) })) : leg.links} />
             </div>
           );
         })}
@@ -53,15 +67,15 @@ export function BookPanel({ trip }: { trip: Trip }) {
         {bookable.length > 0 && (
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {bookable.map((a) => {
-              const [gyg, viator] = experienceLinks(a.city, a.title);
+              const [gyg, viator] = experienceLinks(a.city, a.title, fx.currency).map((l) => ({ ...l, valueUSD: a.estCost * people }));
               return (
                 <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{a.title} {a.booked && <span className="ml-1 text-xs font-medium text-sea">· Booked</span>}</p>
-                    <p className="text-xs text-muted">{formatDate(a.date)} · {a.city}{a.estCost ? ` · ~$${a.estCost} pp` : ""}</p>
+                    <p className="text-xs text-muted">{formatDate(a.date)} · {a.city}{a.estCost ? ` · ${money(trip, a.estCost, true)} pp` : ""}</p>
                   </div>
-                  <a className="btn-ghost px-3 py-1.5 text-xs" href={gyg.url} target="_blank" rel="noopener noreferrer sponsored">GetYourGuide</a>
-                  <a className="btn-ghost px-3 py-1.5 text-xs" href={viator.url} target="_blank" rel="noopener noreferrer sponsored">Viator</a>
+                  <a className="btn-ghost px-3 py-1.5 text-xs" href={go(gyg)} target="_blank" rel="noopener noreferrer sponsored">GetYourGuide</a>
+                  <a className="btn-ghost px-3 py-1.5 text-xs" href={go(viator)} target="_blank" rel="noopener noreferrer sponsored">Viator</a>
                 </li>
               );
             })}
@@ -70,13 +84,13 @@ export function BookPanel({ trip }: { trip: Trip }) {
         {links.experiences.map((e) => (
           <div key={e.city} className="space-y-3">
             <p className="text-sm font-semibold text-ink-soft">More in {e.city}</p>
-            <LinkGrid links={e.links} />
+            <LinkGrid links={e.links} go={go} />
           </div>
         ))}
       </Group>
 
       <Group icon={<Car className="h-5 w-5" />} title="Car rental" subtitle={carAdvice(trip)}>
-        <LinkGrid links={links.cars} />
+        <LinkGrid links={links.cars} go={go} />
       </Group>
 
       <p className="text-xs text-muted">
@@ -130,12 +144,12 @@ const PROVIDER_STYLE: Record<string, string> = {
   Viator: "#186b6d",
 };
 
-function LinkGrid({ links }: { links: BookingLink[] }) {
+function LinkGrid({ links, go }: { links: BookingLink[]; go: (l: BookingLink) => string }) {
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
       {links.map((l) => (
         <li key={l.provider + l.label}>
-          <a href={l.url} target="_blank" rel="noopener noreferrer sponsored" className="card group flex h-full items-start gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-lift">
+          <a href={go(l)} target="_blank" rel="noopener noreferrer sponsored" className="card group flex h-full items-start gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-lift">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-bold text-white" style={{ background: PROVIDER_STYLE[l.provider] ?? "#0b1220" }}>
               {l.provider.slice(0, 1)}
             </span>

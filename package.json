@@ -8,14 +8,19 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "PGLITE_DIR=memory:// node --conditions=react-server --experimental-strip-types --test tests/*.test.ts",
+    "catalog:draft": "node --experimental-strip-types scripts/draft-destination.ts",
+    "catalog:promote": "node --experimental-strip-types scripts/promote-destination.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "@electric-sql/pglite": "^0.5.8",
     "lucide-react": "^1.54.0",
     "next": "^16.4.0",
+    "postgres": "^3.4.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

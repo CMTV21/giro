@@ -1,5 +1,8 @@
+import { distanceKm, fareForDistance, findAirport } from "./airports.ts";
+import { DEFAULT_CURRENCY, fallbackFx, formatLocal, isCurrency, type FxSnapshot } from "./currency.ts";
 import { addDays, monthOf, nightsBetween } from "./dates.ts";
 import { DESTINATIONS, findDestination, type CatalogActivity, type Destination } from "./destinations.ts";
+import { tasteBonus, type TasteProfile } from "./taste.ts";
 import type { Activity, BudgetBreakdown, BudgetTier, Day, Interest, Pace, Slot, Stay, StayType, Trip, TripRequest } from "./types.ts";
 
 export const MAX_TRIP_DAYS = 30;
@@ -76,6 +79,8 @@ export function genericDestination(rawCity: string): Destination {
     country: "",
     aliases: [],
     airport: city,
+    lat: Number.NaN,
+    lon: Number.NaN,
     climate: "temperate",
     palette: PALETTES[hash(slug) % PALETTES.length],
     tagline: `Your own way through ${city}.`,
@@ -184,6 +189,7 @@ interface ScoreContext {
   must: string[];
   avoid: string[];
   catalogSize: number;
+  taste?: TasteProfile;
 }
 
 export function scoreActivity(act: CatalogActivity, index: number, ctx: ScoreContext): number {
@@ -199,6 +205,7 @@ export function scoreActivity(act: CatalogActivity, index: number, ctx: ScoreCon
   if (req.budgetTier === "luxury" && act.cost >= 60) score += 1.5;
   if (req.pace === "relaxed" && act.hrs >= 6) score -= 1.5;
   if (matchesPhrase(act, ctx.must)) score += 20;
+  score += tasteBonus(ctx.taste, act.cats);
   // Catalogs list the iconic experiences first.
   score += ((ctx.catalogSize - index) / ctx.catalogSize) * 1.5;
   return score;
@@ -309,8 +316,8 @@ function themeFor(day: Activity[], city: string, kind: "arrival" | "departure" |
   return top ? THEME_BY_CATEGORY[top] : `Explore ${city}`;
 }
 
-export function buildDays(req: TripRequest, legs: Leg[]): Day[] {
-  const ctxBase = { req, must: phrases(req.mustSee), avoid: phrases(req.avoid) };
+export function buildDays(req: TripRequest, legs: Leg[], taste?: TasteProfile): Day[] {
+  const ctxBase = { req, must: phrases(req.mustSee), avoid: phrases(req.avoid), taste };
   const states = new Map<string, CityState>();
   const totalNights = legs.reduce((s, l) => s + l.nights, 0);
   const paceSlots = SLOTS_BY_PACE[req.pace] ?? SLOTS_BY_PACE.balanced;
@@ -367,6 +374,32 @@ export function buildDays(req: TripRequest, legs: Leg[]): Day[] {
 
 const round10 = (n: number) => Math.round(n / 10) * 10;
 
+/** Where an origin string is on the map: a known airport or a catalog city. */
+export function locate(place: string): { lat: number; lon: number } | undefined {
+  const airport = findAirport(place);
+  if (airport) return airport;
+  const dest = findDestination(place);
+  return dest && Number.isFinite(dest.lat) ? dest : undefined;
+}
+
+/**
+ * Indicative economy return fare per adult (USD). Uses great-circle distance from the origin
+ * (outbound to the first city, home from the last) when both ends are known, otherwise the
+ * catalog's typical fare.
+ */
+export function returnFareUSD(origin: string, legs: Leg[]): number {
+  const from = locate(origin);
+  const first = legs[0].destination;
+  const last = legs[legs.length - 1].destination;
+  const known = (d: Destination) => Number.isFinite(d.lat) && Number.isFinite(d.lon);
+  if (from && known(first) && known(last)) {
+    const out = fareForDistance(distanceKm(from, first));
+    const back = fareForDistance(distanceKm(last, from));
+    return (out + back) / 2;
+  }
+  return first.flightEst;
+}
+
 export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): BudgetBreakdown {
   const tier = req.budgetTier;
   const adults = Math.max(1, req.adults);
@@ -380,7 +413,8 @@ export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): Budg
   const transfers = Math.max(0, legs.length - 1) * 80 * people;
   const localTransport = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].transport * (adults + kids * 0.5), 0) + transfers;
   const activities = days.reduce((s, d) => s + d.activities.reduce((t, a) => t + a.estCost, 0), 0) * (adults + kids * 0.5);
-  const flights = req.origin.trim() ? legs[0].destination.flightEst * FLIGHT_MULTIPLIER[tier] * (adults + kids * 0.75) : 0;
+  const fare = req.origin.trim() ? returnFareUSD(req.origin, legs) : 0;
+  const flights = fare * FLIGHT_MULTIPLIER[tier] * (adults + kids * 0.75);
 
   const out = {
     flights: round10(flights),
@@ -403,7 +437,7 @@ export function packingList(req: TripRequest, legs: Leg[]): string[] {
     "A light day bag",
   ]);
   const month = monthOf(req.startDate);
-  const southern = (d: Destination) => d.slug === "cape-town" || d.slug === "bali";
+  const southern = (d: Destination) => Number.isFinite(d.lat) && d.lat < 0;
   for (const { destination: d } of legs) {
     const summer = southern(d) ? [12, 1, 2].includes(month) : [6, 7, 8].includes(month);
     const winter = southern(d) ? [6, 7, 8].includes(month) : [12, 1, 2].includes(month);
@@ -430,7 +464,7 @@ export function packingList(req: TripRequest, legs: Leg[]): string[] {
   return [...items];
 }
 
-function buildTips(req: TripRequest, legs: Leg[], days: Day[], budget: BudgetBreakdown): string[] {
+function buildTips(req: TripRequest, legs: Leg[], days: Day[], budget: BudgetBreakdown, fx: FxSnapshot): string[] {
   const tips: string[] = [];
   for (const leg of legs) tips.push(...leg.destination.tips.slice(0, 2));
   const month = monthOf(req.startDate);
@@ -444,9 +478,9 @@ function buildTips(req: TripRequest, legs: Leg[], days: Day[], budget: BudgetBre
   if (open >= 2) tips.push(`We've left ${open} open slots. Keep them for spontaneity, add your own stops, or switch on Giro AI to fill them with deeper local picks.`);
   const bookable = days.flatMap((d) => d.activities).filter((a) => a.bookable).length;
   if (bookable) tips.push(`${bookable} activities on this itinerary are worth pre-booking. Use the Book tab to lock in tickets.`);
-  if (req.totalBudget && budget.total > req.totalBudget) {
-    const over = budget.total - req.totalBudget;
-    tips.push(`This plan runs about $${over.toLocaleString()} over your budget. Try an apartment instead of a hotel, a relaxed pace, or shoulder-season dates.`);
+  const totalLocal = budget.total * fx.rate;
+  if (req.totalBudget && totalLocal > req.totalBudget) {
+    tips.push(`This plan runs about ${formatLocal(totalLocal - req.totalBudget, fx.currency)} over your budget. Try an apartment instead of a hotel, a relaxed pace, or shoulder-season dates.`);
   }
   const must = phrases(req.mustSee);
   if (must.length) {
@@ -473,15 +507,29 @@ export function normalizeRequest(input: TripRequest): TripRequest {
     adults: Math.min(16, Math.max(1, Math.round(input.adults || 1))),
     children: Math.min(10, Math.max(0, Math.round(input.children || 0))),
     interests: [...new Set(input.interests ?? [])],
+    currency: isCurrency(input.currency) ? input.currency : DEFAULT_CURRENCY,
     totalBudget: input.totalBudget && input.totalBudget > 0 ? Math.round(input.totalBudget) : undefined,
   };
 }
 
+export interface CurateOptions {
+  /** Exchange-rate snapshot for the request's currency; falls back to built-in rates. */
+  fx?: FxSnapshot;
+  /** Learned preferences that nudge which experiences make the cut. */
+  taste?: TasteProfile;
+}
+
+export function resolveFx(req: TripRequest, fx?: FxSnapshot): FxSnapshot {
+  const currency = req.currency ?? DEFAULT_CURRENCY;
+  return fx && fx.currency === currency && fx.rate > 0 ? fx : fallbackFx(currency);
+}
+
 /** Giro's built-in curation engine: deterministic, instant, works offline. */
-export function curateTrip(input: TripRequest): Trip {
+export function curateTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
   const req = normalizeRequest(input);
+  const fx = resolveFx(req, opts.fx);
   const legs = planLegs(req);
-  const days = buildDays(req, legs);
+  const days = buildDays(req, legs, opts.taste);
   const budget = estimateBudget(req, legs, days);
   const stays: Stay[] = legs.map((l) => ({
     city: l.city,
@@ -503,8 +551,9 @@ export function curateTrip(input: TripRequest): Trip {
     days,
     stays,
     budget,
+    fx,
     packing: packingList(req, legs),
-    tips: buildTips(req, legs, days, budget),
+    tips: buildTips(req, legs, days, budget, fx),
     source: "giro",
     palette: legs[0].destination.palette,
   };
@@ -517,13 +566,13 @@ export function recalcBudget(trip: Trip): Trip {
 }
 
 /** Catalog alternatives for a slot, excluding anything already in the trip. */
-export function suggestAlternatives(trip: Trip, dayIndex: number, slot: Slot, limit = 4): Activity[] {
+export function suggestAlternatives(trip: Trip, dayIndex: number, slot: Slot, limit = 4, taste?: TasteProfile): Activity[] {
   const day = trip.days[dayIndex];
   if (!day) return [];
   const dest = resolveDestination(day.city);
   const used = new Set(trip.days.flatMap((d) => d.activities.map((a) => a.ref ?? a.title)));
   const rank = (catalog: CatalogActivity[]) => {
-    const ctx: ScoreContext = { req: trip.request, must: phrases(trip.request.mustSee), avoid: phrases(trip.request.avoid), catalogSize: catalog.length };
+    const ctx: ScoreContext = { req: trip.request, must: phrases(trip.request.mustSee), avoid: phrases(trip.request.avoid), catalogSize: catalog.length, taste };
     return catalog
       .map((act, i) => ({ act, score: scoreActivity(act, i, ctx) + (act.slot === slot ? 1.5 : 0) }))
       .filter(({ act, score }) => Number.isFinite(score) && !used.has(act.key) && !used.has(act.title) && act.hrs < 6 && fitsSlot(act, slot))

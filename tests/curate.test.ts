@@ -110,3 +110,55 @@ test("share links round-trip a trip", async () => {
   assert.equal(back?.days.length, trip.days.length);
   assert.equal(await decodeTrip("not-a-trip"), undefined);
 });
+
+test("defaults to CAD and converts budgets with the trip's rate", async () => {
+  const { formatMoney } = await import("../src/lib/currency.ts");
+  const trip = curateTrip(base, { fx: { currency: "CAD", rate: 1.4, asOf: "2026-10-01", source: "live" } });
+  assert.equal(trip.request.currency, "CAD");
+  assert.equal(trip.fx.rate, 1.4);
+  assert.equal(formatMoney(1000, trip.fx), "$1,400");
+  assert.equal(formatMoney(1000, { currency: "USD", rate: 1 }), "US$1,000");
+  const legacy = curateTrip({ ...base, currency: undefined });
+  assert.equal(legacy.fx.currency, "CAD", "missing currency falls back to CAD");
+  const tight = curateTrip({ ...base, totalBudget: 100 }, { fx: { currency: "CAD", rate: 1.4, asOf: "", source: "live" } });
+  assert.ok(tight.tips.some((t) => /over your budget/.test(t) && t.includes("$")));
+});
+
+test("flight estimates depend on where you fly from", () => {
+  const toronto = curateTrip({ ...base, origin: "Toronto" }).budget.flights;
+  const vancouver = curateTrip({ ...base, origin: "YVR" }).budget.flights;
+  const madrid = curateTrip({ ...base, origin: "Madrid" }).budget.flights;
+  assert.ok(madrid < toronto && toronto < vancouver, `${madrid} < ${toronto} < ${vancouver}`);
+});
+
+test("partner links use the Canadian storefronts for CAD", () => {
+  const [, expedia, sky, kayak] = flightLinks({ origin: "YYZ", destination: "Lisbon", depart: "2026-05-10", ret: "2026-05-15", adults: 2, children: 0, currency: "CAD" });
+  assert.match(expedia.url, /^https:\/\/www\.expedia\.ca\//);
+  assert.match(sky.url, /^https:\/\/www\.skyscanner\.ca\//);
+  assert.match(kayak.url, /^https:\/\/www\.ca\.kayak\.com\//);
+  const [airbnb, booking] = stayLinks({ city: "Lisbon", checkIn: "2026-05-10", checkOut: "2026-05-15", adults: 2, children: 0, currency: "CAD", maxNightly: 300 });
+  assert.match(airbnb.url, /^https:\/\/www\.airbnb\.ca\/.*price_max=300/);
+  assert.match(booking.url, /selected_currency=CAD/);
+});
+
+test("rate parsing tolerates partial and bad payloads", async () => {
+  const { parseRates, FALLBACK_RATES } = await import("../src/lib/currency.ts");
+  const parsed = parseRates({ date: "2026-10-08", rates: { CAD: 1.37, EUR: "x" } });
+  assert.equal(parsed?.rates.CAD, 1.37);
+  assert.equal(parsed?.rates.EUR, FALLBACK_RATES.EUR);
+  assert.equal(parsed?.asOf, "2026-10-08");
+  assert.equal(parseRates({ rates: {} }), undefined);
+  assert.equal(parseRates(null), undefined);
+});
+
+test("taste profile nudges what gets picked", async () => {
+  const { applySignal, emptyTaste } = await import("../src/lib/taste.ts");
+  let taste = emptyTaste();
+  for (let i = 0; i < 10; i++) taste = applySignal(applySignal(taste, "booked", "nightlife"), "removed", "history");
+  const neutral = curateTrip({ ...base, interests: [] });
+  const tuned = curateTrip({ ...base, interests: [] }, { taste });
+  const count = (t: typeof neutral, cat: string) => t.days.flatMap((d) => d.activities).filter((a) => a.category === cat).length;
+  assert.ok(count(tuned, "nightlife") >= count(neutral, "nightlife"));
+  assert.ok(count(tuned, "history") <= count(neutral, "history"));
+  assert.ok(taste.weights.nightlife! > 0 && taste.weights.history! < 0);
+});

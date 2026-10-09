@@ -2,7 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AIRefusalError, aiAvailable, curateWithClaude } from "@/lib/ai";
+import { CURRENCIES } from "@/lib/currency";
 import { isValidISODate, nightsBetween } from "@/lib/dates";
+import { getRates } from "@/lib/rates.server";
+import { parseTaste } from "@/lib/taste";
 import { BUDGET_TIERS, INTERESTS, PACES, STAY_TYPES } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,6 +19,7 @@ const RequestSchema = z.object({
   adults: z.number().int().min(1).max(16),
   children: z.number().int().min(0).max(10),
   budgetTier: z.enum(BUDGET_TIERS),
+  currency: z.enum(CURRENCIES).default("CAD"),
   totalBudget: z.number().positive().max(10_000_000).optional(),
   pace: z.enum(PACES),
   interests: z.array(z.enum(INTERESTS)).max(INTERESTS.length),
@@ -24,6 +28,7 @@ const RequestSchema = z.object({
   avoid: z.string().max(500).optional(),
   notes: z.string().max(1000).optional(),
   useAI: z.boolean().optional(),
+  taste: z.unknown().optional(),
 });
 
 // Best-effort abuse guard for an unauthenticated endpoint that spends API credit.
@@ -66,7 +71,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const trip = await curateWithClaude(parsed.data);
+    const { taste, ...req } = parsed.data;
+    const table = await getRates();
+    const fx = { currency: req.currency, rate: table.rates[req.currency], asOf: table.asOf, source: table.source };
+    const trip = await curateWithClaude(req, { fx, taste: parseTaste(taste) });
     return NextResponse.json({ trip });
   } catch (err) {
     if (err instanceof AIRefusalError) {

@@ -1,15 +1,36 @@
 "use client";
 
 import { Backpack, Check, Lightbulb } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { Trip } from "@/lib/types";
 
-export function PackingPanel({ trip, onChange }: { trip: Trip; onChange: (t: Trip) => void }) {
-  const packed = new Set(trip.packed ?? []);
+// Packing is personal, even on a shared trip, so ticks live with each traveller rather than in the trip.
+const key = (tripId: string) => `giro.packed.${tripId}`;
+
+function loadPacked(trip: Trip): string[] {
+  try {
+    const raw = localStorage.getItem(key(trip.id));
+    if (raw) return JSON.parse(raw) as string[];
+  } catch {
+    /* storage unavailable */
+  }
+  return trip.packed ?? [];
+}
+
+export function PackingPanel({ trip }: { trip: Trip; onChange?: (t: Trip) => void }) {
+  const [packed, setPacked] = useState<Set<string>>(new Set());
+  useEffect(() => setPacked(new Set(loadPacked(trip))), [trip]);
+
   const toggle = (item: string) => {
     const next = new Set(packed);
     if (next.has(item)) next.delete(item);
     else next.add(item);
-    onChange({ ...trip, packed: [...next] });
+    setPacked(next);
+    try {
+      localStorage.setItem(key(trip.id), JSON.stringify([...next]));
+    } catch {
+      /* storage unavailable */
+    }
   };
   const done = trip.packing.filter((p) => packed.has(p)).length;
 

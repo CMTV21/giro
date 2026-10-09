@@ -38,7 +38,7 @@ test("merges Claude's plan onto Giro's date skeleton", async () => {
       packing: [],
     },
   });
-  const trip = await curateWithClaude(req, client);
+  const trip = await curateWithClaude(req, { client });
   assert.equal(calls[0].model, "claude-opus-5-5");
   assert.equal(trip.source, "ai");
   assert.equal(trip.days.length, 3, "skeleton always wins on length");
@@ -51,5 +51,5 @@ test("merges Claude's plan onto Giro's date skeleton", async () => {
 
 test("surfaces refusals distinctly", async () => {
   const { client } = fakeClient({ stop_reason: "refusal", parsed_output: null });
-  await assert.rejects(curateWithClaude(req, client), AIRefusalError);
+  await assert.rejects(curateWithClaude(req, { client }), AIRefusalError);
 });

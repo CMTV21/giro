@@ -18,9 +18,8 @@ export function SharedImport() {
       const trip = encoded ? await decodeTrip(encoded) : undefined;
       if (!trip) return setFailed(true);
       try {
-        const clean = recalcBudget(trip);
-        saveTrip(clean);
-        router.replace(`/trip/${clean.id}`);
+        const saved = await saveTrip(recalcBudget(trip));
+        router.replace(`/trip/${saved.id}`);
       } catch {
         setFailed(true);
       }

@@ -2,6 +2,8 @@
 
 import { Info, Wallet } from "lucide-react";
 import { useState } from "react";
+import { formatLocal } from "@/lib/currency";
+import { tripFx } from "@/lib/money";
 import type { BudgetBreakdown, Trip } from "@/lib/types";
 
 // Categorical slots validated for CVD separation on the light surface; always paired with the labelled table below.
@@ -13,11 +15,22 @@ const SEGMENTS: { key: keyof Omit<BudgetBreakdown, "total" | "perPerson">; label
   { key: "localTransport", label: "Getting around", color: "#e87ba4", note: "Metro, taxis and transfers between cities." },
 ];
 
-const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 export function BudgetPanel({ trip }: { trip: Trip }) {
-  const b = trip.budget;
+  const fx = tripFx(trip);
+  // Work in the trip's currency throughout; the target is entered in it.
+  const t = trip.budget;
+  const b: BudgetBreakdown = {
+    flights: t.flights * fx.rate,
+    lodging: t.lodging * fx.rate,
+    food: t.food * fx.rate,
+    activities: t.activities * fx.rate,
+    localTransport: t.localTransport * fx.rate,
+    total: t.total * fx.rate,
+    perPerson: t.perPerson * fx.rate,
+  };
   const target = trip.request.totalBudget;
+  const usd = (n: number) => formatLocal(n, fx.currency);
   const [hover, setHover] = useState<string>();
   const parts = SEGMENTS.filter((s) => b[s.key] > 0);
   const people = trip.request.adults + trip.request.children;
@@ -96,7 +109,11 @@ export function BudgetPanel({ trip }: { trip: Trip }) {
       </section>
 
       <p className="flex gap-2 text-xs text-muted">
-        <Info className="h-4 w-4 shrink-0" /> Estimates use typical prices for your budget tier and update as you edit your itinerary. Live prices on partner sites may differ.
+        <Info className="h-4 w-4 shrink-0" />
+        <span>
+          Estimates use typical prices for your budget tier and update as you edit your itinerary. Live prices on partner sites may differ.
+          {fx.currency !== "USD" && ` Shown in ${fx.currency} at US$1 = ${fx.rate.toFixed(fx.rate >= 10 ? 1 : 3)} ${fx.currency} (${fx.source === "live" ? "ECB reference rate" : "built-in rate"}${fx.asOf ? `, ${fx.asOf}` : ""}).`}
+        </span>
       </p>
     </div>
   );

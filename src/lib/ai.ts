@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, tripTitle } from "./curate.ts";
+import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, resolveFx, tripTitle } from "./curate.ts";
+import type { FxSnapshot } from "./currency.ts";
+import type { TasteProfile } from "./taste.ts";
 import { INTERESTS, type Activity, type Day, type Trip, type TripRequest } from "./types.ts";
 
 export const AI_MODEL = "claude-opus-5-5";
@@ -50,9 +52,9 @@ export function aiAvailable(): boolean {
 
 export class AIRefusalError extends Error {}
 
-function skeleton(req: TripRequest) {
+function skeleton(req: TripRequest, taste?: TasteProfile) {
   const legs = planLegs(req);
-  const days = buildDays(req, legs);
+  const days = buildDays(req, legs, taste);
   const lines = days.map((d, i) => {
     const kind = i === 0 ? "arrival" : i === days.length - 1 ? "departure" : d.activities[0]?.category === "transit" ? "transfer" : "full day";
     return `Day ${i + 1} — ${d.date} — ${d.city} (${kind})`;
@@ -61,16 +63,25 @@ function skeleton(req: TripRequest) {
 }
 
 /** Ask Claude to curate the trip, then merge onto Giro's date/leg skeleton so the shape is always valid. */
-export async function curateWithClaude(input: TripRequest, client = new Anthropic()): Promise<Trip> {
+export interface AICurateOptions {
+  client?: Anthropic;
+  fx?: FxSnapshot;
+  taste?: TasteProfile;
+}
+
+export async function curateWithClaude(input: TripRequest, opts: AICurateOptions = {}): Promise<Trip> {
+  const client = opts.client ?? new Anthropic();
   const req = normalizeRequest(input);
-  const { legs, days: fallbackDays, lines } = skeleton(req);
+  const fx = resolveFx(req, opts.fx);
+  const { legs, days: fallbackDays, lines } = skeleton(req, opts.taste);
 
   const brief = [
     `Destinations (in order, with nights): ${legs.map((l) => `${l.city} (${l.nights} nights)`).join(" → ")}`,
     `Travelling from: ${req.origin || "not specified"}`,
     `Dates: ${req.startDate} to ${req.endDate}`,
     `Party: ${req.adults} adults, ${req.children} children`,
-    `Budget tier: ${req.budgetTier}${req.totalBudget ? `, total budget about $${req.totalBudget} USD for the whole party` : ""}`,
+    `Budget tier: ${req.budgetTier}${req.totalBudget ? `, total budget about ${req.totalBudget} ${fx.currency} for the whole party (≈ ${Math.round(req.totalBudget / fx.rate)} USD)` : ""}`,
+    `The traveller thinks in ${fx.currency}; still give every estCost in USD.`,
     `Pace: ${req.pace}`,
     `Interests: ${req.interests.join(", ") || "open to anything"}`,
     `Preferred stay: ${req.stayType}`,
@@ -140,6 +151,7 @@ export async function curateWithClaude(input: TripRequest, client = new Anthropi
       };
     }),
     budget,
+    fx,
     packing: plan.packing.length ? plan.packing : packingList(req, legs),
     tips: plan.tips,
     source: "ai",

@@ -5,10 +5,19 @@ import { Fragment, useState } from "react";
 import { mapsRouteUrl } from "@/lib/booking";
 import { suggestAlternatives, newId } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
+import { money, tripFx } from "@/lib/money";
+import type { VoteTally } from "@/lib/storage";
+import { loadTaste, recordSignal } from "@/lib/taste-client";
 import type { Activity, Day, Slot, Trip } from "@/lib/types";
 import { ActivityCard } from "./ActivityCard";
 
-export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChange: (day: Day) => void }) {
+export interface DayGroupProps {
+  votes?: Record<string, VoteTally>;
+  onVote?: (activityId: string, value: -1 | 0 | 1) => void;
+  readOnly?: boolean;
+}
+
+export function DayPlan({ trip, day, onChange, votes, onVote, readOnly }: { trip: Trip; day: Day; onChange: (day: Day) => void } & DayGroupProps) {
   const [swapping, setSwapping] = useState<string>();
   const [adding, setAdding] = useState(false);
 
@@ -37,6 +46,8 @@ export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChang
             <ActivityCard
               activity={a}
               city={day.city}
+              fx={tripFx(trip)}
+              tripId={trip.id}
               actions={{
                 canMoveUp: i > 0,
                 canMoveDown: i < day.activities.length - 1,
@@ -48,9 +59,23 @@ export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChang
                   const slots = day.activities.map((x) => x.slot);
                   update(next.map((x, k) => ({ ...x, slot: slots[k] })));
                 },
-                onRemove: () => update(day.activities.filter((x) => x.id !== a.id)),
-                onToggleBooked: () => update(day.activities.map((x) => (x.id === a.id ? { ...x, booked: !x.booked } : x))),
+                onRemove: () => {
+                  recordSignal("removed", a.category);
+                  update(day.activities.filter((x) => x.id !== a.id));
+                },
+                onToggleBooked: () => {
+                  if (!a.booked) recordSignal("booked", a.category);
+                  update(day.activities.map((x) => (x.id === a.id ? { ...x, booked: !x.booked } : x)));
+                },
                 onSwap: a.category === "transit" ? undefined : () => setSwapping(swapping === a.id ? undefined : a.id),
+                readOnly,
+                votes: votes?.[a.id],
+                onVote: onVote
+                  ? (value) => {
+                      if (value !== 0) recordSignal(value > 0 ? "voted_up" : "voted_down", a.category);
+                      onVote(a.id, value);
+                    }
+                  : undefined,
               }}
             />
             {swapping === a.id && (
@@ -60,6 +85,8 @@ export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChang
                 slot={a.slot}
                 onClose={() => setSwapping(undefined)}
                 onPick={(alt) => {
+                  recordSignal("swapped_out", a.category);
+                  recordSignal("swapped_in", alt.category);
                   update(day.activities.map((x) => (x.id === a.id ? alt : x)));
                   setSwapping(undefined);
                 }}
@@ -76,7 +103,7 @@ export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChang
         </p>
       )}
 
-      <div className="no-print ml-14">
+      {!readOnly && <div className="no-print ml-14">
         {adding ? (
           <AddStop
             onCancel={() => setAdding(false)}
@@ -91,13 +118,13 @@ export function DayPlan({ trip, day, onChange }: { trip: Trip; day: Day; onChang
             <Plus className="h-4 w-4" /> Add a stop
           </button>
         )}
-      </div>
+      </div>}
     </article>
   );
 }
 
 function SwapPanel({ trip, day, slot, onPick, onClose }: { trip: Trip; day: Day; slot: Slot; onPick: (a: Activity) => void; onClose: () => void }) {
-  const alternatives = suggestAlternatives(trip, day.index, slot);
+  const alternatives = suggestAlternatives(trip, day.index, slot, 4, loadTaste());
   return (
     <li className="mb-5 ml-14 rounded-2xl border border-ink/10 bg-sand/60 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -111,7 +138,7 @@ function SwapPanel({ trip, day, slot, onPick, onClose }: { trip: Trip; day: Day;
               <button type="button" onClick={() => onPick(alt)} className="h-full w-full rounded-xl border border-line bg-surface p-3 text-left transition hover:border-ink/30 hover:shadow-card">
                 <span className="block text-sm font-semibold">{alt.title}</span>
                 <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{alt.description}</span>
-                <span className="mt-1.5 block text-xs font-medium text-ink-soft">{alt.area} · {alt.durationHrs}h · {alt.estCost ? `~$${alt.estCost}` : "Free"}</span>
+                <span className="mt-1.5 block text-xs font-medium text-ink-soft">{alt.area} · {alt.durationHrs}h · {alt.estCost ? money(trip, alt.estCost, true) : "Free"}</span>
               </button>
             </li>
           ))}

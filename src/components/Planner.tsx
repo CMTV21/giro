@@ -4,10 +4,14 @@ import { ArrowRight, CalendarDays, LoaderCircle, MapPin, Plane, Plus, SlidersHor
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, formatRange, isValidISODate, nightsBetween, toISODate } from "@/lib/dates";
+import { CURRENCIES, CURRENCY_NAMES, DEFAULT_CURRENCY, currencySymbol, isCurrency } from "@/lib/currency";
 import { DESTINATIONS, findDestination } from "@/lib/destinations";
 import { checkAI, planTrip } from "@/lib/plan-client";
+import { topInterests } from "@/lib/taste";
+import { loadTaste } from "@/lib/taste-client";
 import { BUDGET_TIERS, INTERESTS, PACES, STAY_TYPES, type Interest, type TripRequest } from "@/lib/types";
 import { Segmented, Stepper, Toggle } from "./controls";
+import { useSession } from "./SessionProvider";
 import { BUDGET_META, INTEREST_META, PACE_META, STAY_META } from "./meta";
 
 const LOADING_LINES = [
@@ -34,7 +38,9 @@ function initialRequest(params: URLSearchParams): TripRequest {
     endDate: params.get("end") ?? "",
     adults: Math.max(1, num("adults", 2)),
     children: Math.max(0, num("children", 0)),
-    budgetTier: "comfort",
+    budgetTier: (BUDGET_TIERS as readonly string[]).includes(params.get("tier") ?? "") ? (params.get("tier") as TripRequest["budgetTier"]) : "comfort",
+    currency: isCurrency(params.get("cur")) ? (params.get("cur") as TripRequest["currency"]) : DEFAULT_CURRENCY,
+    totalBudget: num("budget", 0) > 0 ? num("budget", 0) : undefined,
     pace: "balanced",
     interests: interests.length ? interests : ["culture", "food"],
     stayType: "hotel",
@@ -52,6 +58,18 @@ export function Planner() {
   const [line, setLine] = useState(0);
   const [error, setError] = useState<string>();
   const [today, setToday] = useState<string>();
+  const [tuned, setTuned] = useState(false);
+  const { user } = useSession();
+
+  // Signed-in travellers start from their home currency and airport (unless the link says otherwise).
+  useEffect(() => {
+    if (!user) return;
+    setReq((r) => ({
+      ...r,
+      currency: params.has("cur") ? r.currency : user.homeCurrency,
+      origin: r.origin || user.homeAirport,
+    }));
+  }, [user, params]);
 
   const set = <K extends keyof TripRequest>(key: K, value: TripRequest[K]) => setReq((r) => ({ ...r, [key]: value }));
 
@@ -63,6 +81,12 @@ export function Planner() {
       const start = r.startDate || addDays(toISODate(new Date()), 30);
       return { ...r, startDate: start, endDate: r.endDate || addDays(start, 5) };
     });
+    // Start from the traveller's learned favourites when the link doesn't specify interests.
+    const learned = topInterests(loadTaste(), 3);
+    if (!params.has("interests") && learned.length) {
+      setReq((r) => ({ ...r, interests: learned }));
+      setTuned(true);
+    }
     checkAI().then((ok) => {
       setAiReady(ok);
       if (ok) setReq((r) => ({ ...r, useAI: true }));
@@ -212,6 +236,7 @@ export function Planner() {
         </Section>
 
         <Section n={4} title="What do you love?">
+          {tuned && <p className="-mt-2 mb-3 text-xs text-sea">Pre-selected from your travel DNA. Change anything you like.</p>}
           <div className="flex flex-wrap gap-2">
             {INTERESTS.map((i) => {
               const { label, icon: Icon } = INTEREST_META[i];
@@ -225,6 +250,14 @@ export function Planner() {
         </Section>
 
         <Section n={5} title="Budget">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">Prices shown in</p>
+            <select aria-label="Currency" className="field w-auto py-2" value={req.currency} onChange={(e) => set("currency", e.target.value as TripRequest["currency"])}>
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>{c} · {CURRENCY_NAMES[c]}</option>
+              ))}
+            </select>
+          </div>
           <Segmented ariaLabel="Budget tier" value={req.budgetTier} onChange={(v) => set("budgetTier", v)} options={BUDGET_TIERS.map((b) => ({ value: b, label: `${BUDGET_META[b].symbol} ${BUDGET_META[b].label}`, hint: BUDGET_META[b].hint }))} />
         </Section>
 
@@ -245,8 +278,8 @@ export function Planner() {
             <Section n={7} title="Fine-tune">
               <div className="grid gap-4">
                 <div>
-                  <label className="label" htmlFor="budget">Total budget for the group (USD)</label>
-                  <input id="budget" inputMode="numeric" className="field" placeholder="e.g. 4000" value={req.totalBudget ?? ""} onChange={(e) => {
+                  <label className="label" htmlFor="budget">Total budget for the group ({req.currency ?? DEFAULT_CURRENCY})</label>
+                  <input id="budget" inputMode="numeric" className="field" placeholder={`e.g. ${currencySymbol(req.currency ?? DEFAULT_CURRENCY)}5,000`} value={req.totalBudget ?? ""} onChange={(e) => {
                     const n = Number(e.target.value.replace(/[^0-9]/g, ""));
                     set("totalBudget", n > 0 ? n : undefined);
                   }} />

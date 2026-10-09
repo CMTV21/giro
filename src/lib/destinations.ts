@@ -1,4 +1,8 @@
+import { PROMOTED_DESTINATIONS } from "../data/destinations/index.ts";
+import { MORE_DESTINATIONS } from "./destinations-more.ts";
 import type { BudgetTier, Climate, Interest, Slot } from "./types.ts";
+
+export type Region = "north-america" | "latin-america" | "europe" | "east-asia" | "southeast-asia" | "africa" | "middle-east" | "oceania";
 
 export interface CatalogActivity {
   key: string;
@@ -23,6 +27,10 @@ export interface Destination {
   aliases: string[];
   /** Primary IATA airport/city code. */
   airport: string;
+  /** Coordinates for distance-based fares and weather; NaN when unknown. */
+  lat: number;
+  lon: number;
+  region?: Region;
   climate: Climate;
   palette: [string, string];
   tagline: string;
@@ -39,13 +47,16 @@ export interface Destination {
   activities: CatalogActivity[];
 }
 
-export const DESTINATIONS: Destination[] = [
+const CORE: Destination[] = [
   {
     slug: "paris",
     name: "Paris",
     country: "France",
     aliases: ["paris france"],
     airport: "PAR",
+    lat: 48.8566,
+    lon: 2.3522,
+    region: "europe",
     climate: "temperate",
     palette: ["#1e3a8a", "#f472b6"],
     tagline: "Boulevards, bistros and the world's great museums.",
@@ -96,6 +107,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Japan",
     aliases: ["tokyo japan"],
     airport: "TYO",
+    lat: 35.6762,
+    lon: 139.6503,
+    region: "east-asia",
     climate: "subtropical",
     palette: ["#be123c", "#1e1b4b"],
     tagline: "Neon, nature and the best food city on earth.",
@@ -146,6 +160,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Japan",
     aliases: ["kyoto japan"],
     airport: "OSA",
+    lat: 35.0116,
+    lon: 135.7681,
+    region: "east-asia",
     climate: "subtropical",
     palette: ["#b45309", "#7f1d1d"],
     tagline: "Temples, tea houses and a thousand years of craft.",
@@ -184,6 +201,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Portugal",
     aliases: ["lisboa", "lisbon portugal"],
     airport: "LIS",
+    lat: 38.7223,
+    lon: -9.1393,
+    region: "europe",
     climate: "mediterranean",
     palette: ["#0e7490", "#facc15"],
     tagline: "Sunlit hills, tiled facades and the Atlantic.",
@@ -222,6 +242,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Italy",
     aliases: ["roma", "rome italy"],
     airport: "ROM",
+    lat: 41.9028,
+    lon: 12.4964,
+    region: "europe",
     climate: "mediterranean",
     palette: ["#9a3412", "#fbbf24"],
     tagline: "Three thousand years of history around every corner.",
@@ -260,6 +283,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Spain",
     aliases: ["barcelona spain", "bcn"],
     airport: "BCN",
+    lat: 41.3874,
+    lon: 2.1686,
+    region: "europe",
     climate: "mediterranean",
     palette: ["#c2410c", "#0369a1"],
     tagline: "Gaudí, beaches and dinner at 10pm.",
@@ -298,6 +324,9 @@ export const DESTINATIONS: Destination[] = [
     country: "United Kingdom",
     aliases: ["london uk", "london england"],
     airport: "LON",
+    lat: 51.5072,
+    lon: -0.1276,
+    region: "europe",
     climate: "temperate",
     palette: ["#1f2937", "#dc2626"],
     tagline: "Free museums, royal parks and a pub on every corner.",
@@ -336,6 +365,9 @@ export const DESTINATIONS: Destination[] = [
     country: "United States",
     aliases: ["new york city", "nyc", "manhattan", "new york ny"],
     airport: "NYC",
+    lat: 40.7128,
+    lon: -74.006,
+    region: "north-america",
     climate: "temperate",
     palette: ["#0f172a", "#f59e0b"],
     tagline: "The city that never sleeps, and you won't want to either.",
@@ -374,6 +406,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Mexico",
     aliases: ["cdmx", "mexico city mexico", "ciudad de mexico"],
     airport: "MEX",
+    lat: 19.4326,
+    lon: -99.1332,
+    region: "latin-america",
     climate: "subtropical",
     palette: ["#be185d", "#16a34a"],
     tagline: "Tacos, murals and one of the world's great art scenes.",
@@ -412,6 +447,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Indonesia",
     aliases: ["ubud", "seminyak", "bali indonesia", "denpasar", "canggu"],
     airport: "DPS",
+    lat: -8.5069,
+    lon: 115.2625,
+    region: "southeast-asia",
     climate: "tropical",
     palette: ["#047857", "#f97316"],
     tagline: "Rice terraces, temples and long beach sunsets.",
@@ -450,6 +488,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Thailand",
     aliases: ["bangkok thailand", "krung thep"],
     airport: "BKK",
+    lat: 13.7563,
+    lon: 100.5018,
+    region: "southeast-asia",
     climate: "tropical",
     palette: ["#a16207", "#7c3aed"],
     tagline: "Golden temples, river life and street food at 2am.",
@@ -488,6 +529,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Morocco",
     aliases: ["marrakesh", "marrakech morocco"],
     airport: "RAK",
+    lat: 31.6295,
+    lon: -7.9811,
+    region: "africa",
     climate: "desert",
     palette: ["#b91c1c", "#ea580c"],
     tagline: "Souks, riads and the edge of the Sahara.",
@@ -525,6 +569,9 @@ export const DESTINATIONS: Destination[] = [
     country: "Iceland",
     aliases: ["reykjavik", "iceland", "reykjavík iceland"],
     airport: "REK",
+    lat: 64.1466,
+    lon: -21.9426,
+    region: "europe",
     climate: "cold",
     palette: ["#0f766e", "#6366f1"],
     tagline: "Glaciers, geysers and the northern lights.",
@@ -562,6 +609,9 @@ export const DESTINATIONS: Destination[] = [
     country: "South Africa",
     aliases: ["cape town south africa", "capetown"],
     airport: "CPT",
+    lat: -33.9249,
+    lon: 18.4241,
+    region: "africa",
     climate: "mediterranean",
     palette: ["#1d4ed8", "#d97706"],
     tagline: "Mountains, wine country and two oceans.",
@@ -594,6 +644,8 @@ export const DESTINATIONS: Destination[] = [
     ],
   },
 ];
+
+export const DESTINATIONS: Destination[] = [...CORE, ...MORE_DESTINATIONS, ...PROMOTED_DESTINATIONS];
 
 /** Normalize a free-text city name for matching. */
 export function normalizeCity(input: string): string {

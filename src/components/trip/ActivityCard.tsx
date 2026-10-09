@@ -1,7 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleCheck, Clock, ExternalLink, Lightbulb, MapPin, Shuffle, Ticket, Trash2 } from "lucide-react";
-import { experienceLinks, mapsSearchUrl } from "@/lib/booking";
+import { ChevronDown, ChevronUp, CircleCheck, Clock, ExternalLink, Lightbulb, MapPin, Shuffle, ThumbsDown, ThumbsUp, Ticket, Trash2 } from "lucide-react";
+import { experienceLinks, mapsSearchUrl, trackedHref } from "@/lib/booking";
+import type { VoteTally } from "@/lib/storage";
+import type { FxSnapshot } from "@/lib/currency";
+import { formatMoney } from "@/lib/currency";
 import type { Activity } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
 
@@ -14,14 +17,21 @@ export interface ActivityActions {
   onToggleBooked: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** Present on shared trips: the group's votes and a way to cast yours. */
+  votes?: VoteTally;
+  onVote?: (value: -1 | 0 | 1) => void;
+  /** Viewers can vote but not edit. */
+  readOnly?: boolean;
 }
 
-export function ActivityCard({ activity: a, city, actions }: { activity: Activity; city: string; actions: ActivityActions }) {
+export function ActivityCard({ activity: a, city, fx, tripId, actions }: { activity: Activity; city: string; fx: FxSnapshot; tripId?: string; actions: ActivityActions }) {
   const meta = CATEGORY_META[a.category] ?? CATEGORY_META.free;
   const Icon = meta.icon;
   const isTransit = a.category === "transit";
   const isFree = a.category === "free";
-  const ticketUrl = a.bookable ? experienceLinks(city, a.title)[0].url : undefined;
+  const ticket = a.bookable ? experienceLinks(city, a.title, fx.currency)[0] : undefined;
+  const ticketUrl = ticket ? trackedHref({ ...ticket, valueUSD: a.estCost }, tripId) : undefined;
+  const v = actions.votes;
 
   return (
     <li className="group relative flex gap-4">
@@ -38,7 +48,7 @@ export function ActivityCard({ activity: a, city, actions }: { activity: Activit
           {!isFree && (
             <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>
           )}
-          {!isTransit && !isFree && <span>{a.estCost ? `~$${a.estCost}` : "Free"}</span>}
+          {!isTransit && !isFree && <span>{a.estCost ? formatMoney(a.estCost, fx, { approx: true }) : "Free"}</span>}
           {a.booked && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Booked</span>}
         </div>
         <h4 className="mt-1.5 text-[17px] leading-snug font-semibold">{a.title}</h4>
@@ -59,7 +69,17 @@ export function ActivityCard({ activity: a, city, actions }: { activity: Activit
               <Ticket className="h-3.5 w-3.5" /> Get tickets <ExternalLink className="h-3 w-3" />
             </a>
           )}
-          <span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+          {actions.onVote && !isTransit && (
+            <span className="ml-1 flex items-center gap-0.5 rounded-full border border-line px-1" title={v?.upBy.length ? `In: ${v.upBy.join(", ")}` : "Vote"}>
+              <button type="button" aria-label="Vote for this" aria-pressed={v?.mine === 1} onClick={() => actions.onVote!(v?.mine === 1 ? 0 : 1)} className={`inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-xs font-semibold transition ${v?.mine === 1 ? "text-sea" : "text-muted hover:text-ink"}`}>
+                <ThumbsUp className="h-3.5 w-3.5" /> {v?.up || ""}
+              </button>
+              <button type="button" aria-label="Vote against this" aria-pressed={v?.mine === -1} onClick={() => actions.onVote!(v?.mine === -1 ? 0 : -1)} className={`inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-xs font-semibold transition ${v?.mine === -1 ? "text-brand-dark" : "text-muted hover:text-ink"}`}>
+                <ThumbsDown className="h-3.5 w-3.5" /> {v?.down || ""}
+              </button>
+            </span>
+          )}
+          {!actions.readOnly && <span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
             {a.bookable && (
               <IconBtn label={a.booked ? "Mark as not booked" : "Mark as booked"} onClick={actions.onToggleBooked}><CircleCheck className={`h-4 w-4 ${a.booked ? "text-sea" : ""}`} /></IconBtn>
             )}
@@ -67,7 +87,7 @@ export function ActivityCard({ activity: a, city, actions }: { activity: Activit
             <IconBtn label="Move earlier" disabled={!actions.canMoveUp} onClick={() => actions.onMove(-1)}><ChevronUp className="h-4 w-4" /></IconBtn>
             <IconBtn label="Move later" disabled={!actions.canMoveDown} onClick={() => actions.onMove(1)}><ChevronDown className="h-4 w-4" /></IconBtn>
             <IconBtn label="Remove" onClick={actions.onRemove}><Trash2 className="h-4 w-4" /></IconBtn>
-          </span>
+          </span>}
         </div>
       </div>
     </li>

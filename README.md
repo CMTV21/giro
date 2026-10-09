@@ -1,69 +1,91 @@
 # Giro — trips, curated
 
-Giro turns a few details (where, when, who, what you love, budget) into a day-by-day itinerary. It then hands you off to Google Flights, Expedia, Skyscanner, Kayak, Airbnb, Booking.com, Vrbo, GetYourGuide and Viator, pre-filled with your dates and party size.
+Giro turns a few details (where, when, who, what you love, budget) into a day-by-day itinerary. It then hands travellers off to Google Flights, Expedia, Skyscanner, Kayak, Airbnb, Booking.com, Vrbo, GetYourGuide and Viator, pre-filled with their dates, party size and currency. Every partner click is tracked for commission.
 
-It's inspired by planners like TripHobo, and built around two layers:
-
-| Simple (default) | Advanced (one click away) |
+| Simple (default) | Advanced and beyond |
 |---|---|
-| Five questions → a full trip in under a second | Multi-city routing (up to 6 cities) with transfer days and open-jaw flights |
-| Days clustered by neighbourhood | Pace, stay style, total budget, must-sees, things to skip, free-text notes |
-| One-tap booking links for flights, stays, tickets and cars | Swap, reorder, remove or add stops; the budget recalculates as you edit |
-| Budget estimate and packing list | Calendar export (.ics), print/PDF, copy as text, share link |
+| Five questions → a full trip in under a second | Multi-city routing (up to 6 cities), open-jaw flights, transfer days |
+| Prices in **CAD by default**, plus 9 other currencies | Pace, stay style, total budget, must-sees, things to skip |
+| Days clustered by neighbourhood | Swap, reorder, remove or add stops; budget recalculates live |
+| One-tap booking on Canadian storefronts (expedia.ca, airbnb.ca…) | **Accounts**: trips on every device; browser trips move in on sign-in |
+| Budget estimate, packing list, tips | **Group trips**: invite links, roles, voting, shared expenses with settle-up |
+| | **Discover**: "Where can we go for C$4,000?" across the whole catalog |
+| | **Today (Giro Live)**: now/next, forecast, rain plan, running-late re-plan |
+| | **Travel DNA**: learns from swaps, removals, bookings and votes |
 | | **Giro AI**: Claude researches any destination and hand-picks real places |
+| | **Partner revenue dashboard**: clicks, trip value and projected commission |
 
 ## Quick start
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm test           # engine, booking-link, export and AI-merge tests
+npm run dev        # http://localhost:3000. Data is stored in an embedded Postgres under .data/
+npm test           # 40 tests: engine, currency, catalog, auth, groups, split, clicks, live, discover
 npm run typecheck
 npm run build && npm start
 ```
 
-Copy `.env.example` to `.env.local` to configure the optional features:
+Configuration lives in `.env.local` (see `.env.example`). Everything is optional for local development:
 
-- `ANTHROPIC_API_KEY` turns on **Giro AI**, which curates with Claude (`claude-opus-5-5`, structured JSON output, server-side refusal fallback). Without a key, the app uses the built-in engine and the AI toggle shows as unavailable.
-- `NEXT_PUBLIC_*` affiliate IDs are appended to outbound partner links once you join each program.
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Turns on Giro AI (`claude-opus-5-5`, structured output, server-side refusal fallback). |
+| `DATABASE_URL` | Postgres for production (Neon, Supabase, RDS, Railway…). Without it, PGlite (embedded Postgres) persists to `.data/`. **Serverless hosts need `DATABASE_URL`.** |
+| `ADMIN_EMAILS` | Comma-separated emails allowed to see `/admin/revenue`. |
+| `NEXT_PUBLIC_*` partner IDs | Appended to outbound links once you're accepted into each affiliate program. |
+| `OPEN_METEO_API_KEY` | Commercial weather API for Giro Live (Open-Meteo is free for non-commercial use only). |
+
+## Growing the city catalog
+
+There are 26 hand-curated cities (300+ experiences), plus a fallback that plans any city on earth. There are three ways to grow:
+
+1. **Hand-curate.** Add entries to `src/lib/destinations-more.ts`. `npm test` validates every entry against `src/lib/catalog-schema.ts`, checking prices, duplicates, evening and kid coverage, and coordinates.
+2. **AI-drafted, human-reviewed (recommended for scale).**
+   ```bash
+   ANTHROPIC_API_KEY=… npm run catalog:draft -- "Porto"     # writes catalog-drafts/porto.json
+   # review every place, price and coordinate, then:
+   npm run catalog:promote -- porto                          # validates and adds to the live catalog
+   ```
+   With a reviewer approving a few cities a day, the catalog can reach the top 100 destinations in weeks.
+3. **Giro AI on demand.** Any city outside the catalog is fully researched by Claude when Giro AI is on.
 
 ## How it works
 
 ```
 src/
-  app/                    Next.js 16 App Router pages
-    page.tsx              landing page (renders a real sample day from the engine)
-    plan/                 planner (Simple / Advanced)
-    trip/[id]/            itinerary · book · budget · packing & tips
-    trips/  explore/      saved trips, destination inspiration
-    shared/               opens a trip from a share link
-    api/curate/           POST → Claude curation (validated, rate-limited)
-  lib/
-    curate.ts             built-in curation engine (deterministic, offline, instant)
-    destinations.ts       curated catalog: 14 cities, 160+ real experiences, areas, costs
-    booking.ts            partner deep-link builders (+ affiliate IDs)
-    ai.ts                 Claude integration, merged onto the engine's date skeleton
-    export.ts             .ics calendar, text export, compressed share links
-    storage.ts            browser persistence (swap for an API when accounts land)
-  components/             UI (Tailwind v4, lucide icons)
-tests/                    node:test suites
+  app/                  pages and API routes (Next.js 16 App Router)
+    plan/ trip/[id]/    planner; trip view (itinerary · today · book · budget · group · packing)
+    discover/ explore/  budget-first search; inspiration
+    login/ signup/ account/ join/[token]/
+    admin/revenue/      partner clicks and projected commission (ADMIN_EMAILS only)
+    go/                 outbound partner redirect + click logging (allow-listed hosts only)
+    api/                auth, me, trips, invites, votes, expenses, curate (AI), rates, weather
+  lib/                  shared logic (pure, tested)
+    curate.ts           curation engine; taste-aware scoring; distance-based fares
+    destinations*.ts    catalog · catalog-schema.ts validation
+    currency.ts         10 currencies, CAD default, ECB rates via Frankfurter with offline fallback
+    booking.ts          partner deep links (country storefronts by currency) · affiliates.ts programs
+    discover.ts live.ts weather.ts taste.ts split.ts trip-schema.ts
+  server/               server-only: db (Postgres/PGlite + migrations), auth, users, trips, clicks
+scripts/                catalog draft/promote pipeline
+tests/                  node:test suites (server tests run against in-memory Postgres)
 ```
 
-**Curation engine.** It splits nights across cities, builds arrival, transfer and departure days, and sets the number of slots by pace. It scores each experience on interest overlap, family fit, budget tier, must-sees and avoids, then places stops near the day's anchor to cut transit. Full-day excursions are limited to one per three days. Cities outside the catalog get a sensible framework; Giro AI fills those with real places.
+**Security notes.** Passwords use scrypt with per-user salts. Sessions are random tokens stored only as SHA-256 hashes, in `HttpOnly`, `SameSite=Lax` cookies (`Secure` in production). Every state-changing request must be same-origin, which defends against CSRF. Sign-in and sign-up are rate-limited in the database. Trip documents are schema-validated and size-capped on every write. Shared trips use optimistic concurrency, so concurrent edits are reported rather than lost. `/go` redirects only to allow-listed partner hosts over HTTPS. Share links and imports are treated as untrusted input.
 
-**Giro AI.** The server asks Claude for a schema-constrained plan, then merges it onto the engine's skeleton. Dates, legs and day count therefore always stay valid, and any day Claude misses falls back to the engine. If the AI is unavailable, busy, or refuses a request, the client silently uses the engine and shows a short notice.
+## About the integrations
 
-## About the "integrations"
-
-Today the integrations are **deep links**: search URLs pre-filled with destination, dates, travellers and a price filter, which open on the partner's site. That's how most planners start, and it needs no partnership approval. Moving to in-app search and booking means joining partner programs one provider at a time. Each provider is isolated in `src/lib/booking.ts`, so these are drop-in replacements:
+Booking happens through **deep links**: public search URLs that open on the partner's site already filled in. Moving to in-app search and booking means joining partner APIs one at a time:
 
 | Need | Realistic route |
 |---|---|
 | Live flight prices | Google Flights has no public API. Use Duffel, Amadeus Self-Service, Kiwi.com Tequila or the Skyscanner partner API. |
-| Hotels | Booking.com Affiliate Partner Program / Demand API; Expedia Group Rapid API |
-| Homes | Airbnb doesn't offer a public booking API. Keep deep links, or add Vrbo through Expedia Group. |
-| Tickets & tours | GetYourGuide and Viator partner APIs (both offer affiliate commissions) |
+| Hotels | Booking.com Affiliate Partner Programme / Demand API; Expedia Group Rapid API |
+| Homes | Airbnb doesn't offer a public booking API or affiliate program. Keep deep links, or add Vrbo through Expedia Group. |
+| Tickets & tours | GetYourGuide and Viator partner programs (commission-based) |
 
-Trips are stored in the browser (`localStorage`). Share links carry the whole trip, compressed, in the URL fragment, which is never sent to a server. The decoder treats the payload as untrusted input.
+### Commissions
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for product and business directions.
+Every partner link goes through `/go`, which records the click, the estimated trip value behind it and the projected commission. Booking.com (`label`) and GetYourGuide (`cmp`) clicks carry a per-click `giro-…` sub-ID, so payouts can be reconciled to individual clicks. Commission and conversion rates in `src/lib/affiliates.ts` are **illustrative defaults**. Replace them with your contracted terms, and confirm each program's parameter names in its partner dashboard when you activate it.
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's next.

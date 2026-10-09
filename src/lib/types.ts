@@ -1,3 +1,5 @@
+import type { Currency, FxSnapshot } from "./currency.ts";
+
 export const INTERESTS = [
   "culture",
   "food",
@@ -35,7 +37,9 @@ export interface TripRequest {
   adults: number;
   children: number;
   budgetTier: BudgetTier;
-  /** Optional hard budget for the whole party, in USD. */
+  /** Display currency; defaults to CAD. */
+  currency?: Currency;
+  /** Optional hard budget for the whole party, in `currency`. */
   totalBudget?: number;
   pace: Pace;
   interests: Interest[];
@@ -54,7 +58,7 @@ export interface Activity {
   category: Interest | "transit" | "free";
   slot: Slot;
   durationHrs: number;
-  /** Estimated cost per adult, USD. */
+  /** Estimated cost per adult, USD (converted for display). */
   estCost: number;
   area?: string;
   tip?: string;
@@ -101,7 +105,10 @@ export interface Trip {
   summary: string;
   days: Day[];
   stays: Stay[];
+  /** All amounts in USD; display with `fx`. */
   budget: BudgetBreakdown;
+  /** Exchange rate snapshot taken when the trip was planned. */
+  fx: FxSnapshot;
   packing: string[];
   tips: string[];
   source: "giro" | "ai";

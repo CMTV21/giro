@@ -1,12 +1,13 @@
+import { findAirport } from "./airports.ts";
+import type { Currency } from "./currency.ts";
 import { findDestination } from "./destinations.ts";
 import type { TripRequest } from "./types.ts";
 
 /**
- * Deep links into partner booking sites, pre-filled with the traveller's dates and party size.
- *
- * These are public search URLs, not API integrations: the user finishes booking on the partner
- * site. Affiliate IDs (when configured) are appended so referrals can be monetised. To move to
- * in-app booking, replace a provider's `url` builder with a call to its partner API.
+ * Deep links into partner booking sites, pre-filled with the traveller's dates, party size and
+ * currency. These are public search URLs: the traveller finishes booking on the partner site.
+ * Partner IDs (when configured) are appended, and the UI routes clicks through `/go` so they're
+ * attributed. To move to in-app booking, replace a provider's builder with its partner API.
  */
 
 export type ProviderKind = "flights" | "stays" | "cars" | "experiences";
@@ -17,24 +18,29 @@ export interface BookingLink {
   label: string;
   url: string;
   blurb: string;
+  /** Rough value of what would be booked behind this link (USD), for commission projections. */
+  valueUSD?: number;
 }
 
-export interface FlightQuery {
+interface Party {
+  adults: number;
+  children: number;
+  currency?: Currency;
+}
+
+export interface FlightQuery extends Party {
   origin: string;
   destination: string;
   depart: string;
   /** Omit for a one-way search. */
   ret?: string;
-  adults: number;
-  children: number;
 }
 
-export interface StayQuery {
+export interface StayQuery extends Party {
   city: string;
   checkIn: string;
   checkOut: string;
-  adults: number;
-  children: number;
+  /** Nightly price cap in the query's currency. */
   maxNightly?: number;
 }
 
@@ -59,11 +65,27 @@ function withParams(base: string, params: Record<string, string | number | undef
   return url.toString();
 }
 
+/** Country storefronts price in local currency, so Canadians see CAD without extra steps. */
+interface Market {
+  expedia: string;
+  kayak: string;
+  skyscanner: string;
+  airbnb: string;
+}
+const MARKETS: Partial<Record<Currency, Market>> = {
+  CAD: { expedia: "www.expedia.ca", kayak: "www.ca.kayak.com", skyscanner: "www.skyscanner.ca", airbnb: "www.airbnb.ca" },
+  GBP: { expedia: "www.expedia.co.uk", kayak: "www.kayak.co.uk", skyscanner: "www.skyscanner.net", airbnb: "www.airbnb.co.uk" },
+  AUD: { expedia: "www.expedia.com.au", kayak: "www.kayak.com.au", skyscanner: "www.skyscanner.com.au", airbnb: "www.airbnb.com.au" },
+};
+const DEFAULT_MARKET: Market = { expedia: "www.expedia.com", kayak: "www.kayak.com", skyscanner: "www.skyscanner.com", airbnb: "www.airbnb.com" };
+export const marketFor = (currency?: Currency): Market => (currency && MARKETS[currency]) || DEFAULT_MARKET;
+
 /** Resolve a city or code to an IATA code where we know one, otherwise return the input. */
 export function airportCode(place: string): string {
   const trimmed = place.trim();
+  // A code the traveller typed (e.g. "JFK") is kept as-is rather than widened to a city code.
   if (/^[A-Za-z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
-  return findDestination(trimmed)?.airport ?? trimmed;
+  return findAirport(trimmed)?.code ?? findDestination(trimmed)?.airport ?? trimmed;
 }
 
 const isIata = (s: string) => /^[A-Z]{3}$/.test(s);
@@ -79,6 +101,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
   const to = airportCode(q.destination);
   const pax = q.adults + q.children;
   const route = `${q.origin} → ${q.destination}`;
+  const m = marketFor(q.currency);
   const links: BookingLink[] = [];
 
   links.push({
@@ -90,7 +113,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
       q: q.ret
         ? `Flights to ${q.destination} from ${q.origin} on ${q.depart} through ${q.ret} for ${pax} passengers`
         : `One way flights to ${q.destination} from ${q.origin} on ${q.depart} for ${pax} passengers`,
-      curr: "USD",
+      curr: q.currency ?? "USD",
     }),
   });
 
@@ -99,7 +122,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
     kind: "flights",
     label: q.ret ? "Search Expedia flights" : `${route} on Expedia`,
     blurb: "Bundle with a hotel and save on packages.",
-    url: withParams("https://www.expedia.com/Flights-Search", {
+    url: withParams(`https://${m.expedia}/Flights-Search`, {
       trip: q.ret ? "roundtrip" : "oneway",
       leg1: `from:${from},to:${to},departure:${mdy(q.depart)}TANYT`,
       leg2: q.ret ? `from:${to},to:${from},departure:${mdy(q.ret)}TANYT` : undefined,
@@ -110,7 +133,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
   });
 
   if (isIata(from) && isIata(to)) {
-    const sky = `https://www.skyscanner.com/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/${yymmdd(q.depart)}/${q.ret ? `${yymmdd(q.ret)}/` : ""}`;
+    const sky = `https://${m.skyscanner}/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/${yymmdd(q.depart)}/${q.ret ? `${yymmdd(q.ret)}/` : ""}`;
     links.push({
       provider: "Skyscanner",
       kind: "flights",
@@ -128,13 +151,14 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
       kind: "flights",
       label: q.ret ? "Search Kayak" : `${route} on Kayak`,
       blurb: "Price alerts and hacker fares.",
-      url: `https://www.kayak.com/flights/${from}-${to}/${q.depart}${q.ret ? `/${q.ret}` : ""}/${q.adults}adults${kids}?sort=bestflight_a`,
+      url: `https://${m.kayak}/flights/${from}-${to}/${q.depart}${q.ret ? `/${q.ret}` : ""}/${q.adults}adults${kids}?sort=bestflight_a`,
     });
   }
   return links;
 }
 
 export function stayLinks(q: StayQuery): BookingLink[] {
+  const m = marketFor(q.currency);
   const children = q.children;
   return [
     {
@@ -142,12 +166,12 @@ export function stayLinks(q: StayQuery): BookingLink[] {
       kind: "stays",
       label: "Browse Airbnb homes",
       blurb: "Whole apartments and unique stays, ideal for families and longer trips.",
-      url: withParams(`https://www.airbnb.com/s/${enc(q.city)}/homes`, {
+      url: withParams(`https://${m.airbnb}/s/${enc(q.city)}/homes`, {
         checkin: q.checkIn,
         checkout: q.checkOut,
         adults: q.adults,
         children: children || undefined,
-        price_max: q.maxNightly,
+        price_max: q.maxNightly ? Math.round(q.maxNightly) : undefined,
       }),
     },
     {
@@ -162,6 +186,7 @@ export function stayLinks(q: StayQuery): BookingLink[] {
         group_adults: q.adults,
         group_children: children,
         no_rooms: Math.max(1, Math.ceil(q.adults / 2)),
+        selected_currency: q.currency,
         aid: env("NEXT_PUBLIC_BOOKING_AID"),
       }),
     },
@@ -170,7 +195,7 @@ export function stayLinks(q: StayQuery): BookingLink[] {
       kind: "stays",
       label: "Search Expedia hotels",
       blurb: "Member prices and One Key rewards.",
-      url: withParams("https://www.expedia.com/Hotel-Search", {
+      url: withParams(`https://${m.expedia}/Hotel-Search`, {
         destination: q.city,
         startDate: q.checkIn,
         endDate: q.checkOut,
@@ -195,21 +220,22 @@ export function stayLinks(q: StayQuery): BookingLink[] {
   ];
 }
 
-export function carLinks(city: string, from: string, to: string): BookingLink[] {
+export function carLinks(city: string, from: string, to: string, currency?: Currency): BookingLink[] {
+  const m = marketFor(currency);
   return [
     {
       provider: "Kayak",
       kind: "cars",
       label: "Compare rental cars",
       blurb: "Every major rental brand side by side.",
-      url: `https://www.kayak.com/cars/${enc(city)}/${from}/${to}`,
+      url: `https://${m.kayak}/cars/${enc(city)}/${from}/${to}`,
     },
     {
       provider: "Expedia",
       kind: "cars",
       label: "Expedia car rental",
       blurb: "Often cheaper when bundled with a hotel.",
-      url: withParams("https://www.expedia.com/carsearch", {
+      url: withParams(`https://${m.expedia}/carsearch`, {
         locn: city,
         date1: mdy(from),
         date2: mdy(to),
@@ -219,7 +245,7 @@ export function carLinks(city: string, from: string, to: string): BookingLink[] 
   ];
 }
 
-export function experienceLinks(city: string, query?: string): BookingLink[] {
+export function experienceLinks(city: string, query?: string, currency?: Currency): BookingLink[] {
   const q = query ? `${query} ${city}` : city;
   return [
     {
@@ -227,7 +253,7 @@ export function experienceLinks(city: string, query?: string): BookingLink[] {
       kind: "experiences",
       label: "Tickets and tours on GetYourGuide",
       blurb: "Skip-the-line tickets with free cancellation.",
-      url: withParams("https://www.getyourguide.com/s/", { q, partner_id: env("NEXT_PUBLIC_GETYOURGUIDE_PARTNER_ID") }),
+      url: withParams("https://www.getyourguide.com/s/", { q, currency, partner_id: env("NEXT_PUBLIC_GETYOURGUIDE_PARTNER_ID") }),
     },
     {
       provider: "Viator",
@@ -257,30 +283,52 @@ export function mapsRouteUrl(stops: string[]): string | undefined {
   });
 }
 
-/** All booking links for a trip, grouped by leg. */
-export function tripBookingLinks(req: TripRequest, legs: { city: string; checkIn: string; checkOut: string; maxNightly?: number }[]) {
+export interface LegValue {
+  city: string;
+  checkIn: string;
+  checkOut: string;
+  /** Nightly cap in the trip currency. */
+  maxNightly?: number;
+  /** Estimated lodging spend for this leg (USD). */
+  lodgingUSD?: number;
+}
+
+/** All booking links for a trip, grouped by leg, with value estimates for commission projections. */
+export function tripBookingLinks(req: TripRequest, legs: LegValue[], flightsUSD = 0) {
   const first = legs[0];
   const last = legs[legs.length - 1];
-  const base = { adults: req.adults, children: req.children };
+  const base = { adults: req.adults, children: req.children, currency: req.currency };
   const hasOrigin = req.origin.trim().length > 0;
   const openJaw = legs.length > 1 && first.city !== last.city;
+  const withValue = (links: BookingLink[], valueUSD?: number) => links.map((l) => ({ ...l, valueUSD }));
 
   const flights: { title: string; links: BookingLink[] }[] = !hasOrigin
     ? []
     : openJaw
       ? [
-          { title: `Outbound · ${req.origin} → ${first.city}`, links: flightLinks({ ...base, origin: req.origin, destination: first.city, depart: req.startDate }) },
-          { title: `Return · ${last.city} → ${req.origin}`, links: flightLinks({ ...base, origin: last.city, destination: req.origin, depart: req.endDate }) },
+          { title: `Outbound · ${req.origin} → ${first.city}`, links: withValue(flightLinks({ ...base, origin: req.origin, destination: first.city, depart: req.startDate }), flightsUSD / 2) },
+          { title: `Return · ${last.city} → ${req.origin}`, links: withValue(flightLinks({ ...base, origin: last.city, destination: req.origin, depart: req.endDate }), flightsUSD / 2) },
         ]
-      : [{ title: `Round trip · ${req.origin} ⇄ ${first.city}`, links: flightLinks({ ...base, origin: req.origin, destination: first.city, depart: req.startDate, ret: req.endDate }) }];
+      : [{ title: `Round trip · ${req.origin} ⇄ ${first.city}`, links: withValue(flightLinks({ ...base, origin: req.origin, destination: first.city, depart: req.startDate, ret: req.endDate }), flightsUSD) }];
 
   return {
     flights,
     stays: legs.map((leg) => ({
       ...leg,
-      links: stayLinks({ city: leg.city, checkIn: leg.checkIn, checkOut: leg.checkOut, ...base, maxNightly: leg.maxNightly }),
+      links: withValue(stayLinks({ city: leg.city, checkIn: leg.checkIn, checkOut: leg.checkOut, ...base, maxNightly: leg.maxNightly }), leg.lodgingUSD),
     })),
-    cars: carLinks(first.city, req.startDate, req.endDate),
-    experiences: legs.map((leg) => ({ city: leg.city, links: experienceLinks(leg.city) })),
+    cars: carLinks(first.city, req.startDate, req.endDate, req.currency),
+    experiences: legs.map((leg) => ({ city: leg.city, links: experienceLinks(leg.city, undefined, req.currency) })),
   };
+}
+
+/**
+ * Route an outbound partner link through Giro's click tracker (`/go`), which records the click
+ * for commission reconciliation and adds a per-click sub-ID where the program supports one.
+ */
+export function trackedHref(link: Pick<BookingLink, "url" | "provider" | "kind" | "valueUSD">, tripId?: string): string {
+  const p = new URLSearchParams({ u: link.url, p: link.provider, k: link.kind });
+  if (tripId) p.set("t", tripId);
+  if (link.valueUSD && link.valueUSD > 0) p.set("v", String(Math.round(link.valueUSD)));
+  return `/go?${p.toString()}`;
 }
