@@ -47,7 +47,30 @@ function SaveButton({ onSave }: { onSave: () => Promise<void> }) {
 function Members({ bundle, onChanged, onLeft }: { bundle: TripBundle; onChanged: () => void; onLeft: () => void }) {
   const [copied, setCopied] = useState<string>();
   const [error, setError] = useState<string>();
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
+  const [emailState, setEmailState] = useState<string>();
   const canInvite = bundle.role !== "viewer";
+
+  async function sendInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setError(undefined);
+    setEmailState("Sending…");
+    try {
+      const res = await api<{ path: string; emailed?: boolean; reason?: string }>(`/api/trips/${tripId}/invites`, { method: "POST", body: JSON.stringify({ role: inviteRole, email: inviteEmail.trim() }) });
+      if (res.emailed) {
+        setEmailState(`Invite sent to ${inviteEmail.trim()}.`);
+        setInviteEmail("");
+      } else {
+        // Email isn't available: fall back to a link they can paste anywhere.
+        await navigator.clipboard.writeText(`${window.location.origin}${res.path}`).catch(() => {});
+        setEmailState(res.reason === "limit" ? "Daily email limit reached, so we copied the invite link instead." : "Email isn't set up yet, so we copied the invite link instead. Paste it in a message.");
+      }
+    } catch (err) {
+      setEmailState(undefined);
+      setError(err instanceof Error ? err.message : "Couldn't send the invite.");
+    }
+  }
   const tripId = encodeURIComponent(bundle.trip.id);
 
   async function invite(role: "editor" | "viewer") {
@@ -95,7 +118,19 @@ function Members({ bundle, onChanged, onLeft }: { bundle: TripBundle; onChanged:
       </ul>
       {canInvite && (
         <div className="mt-4 rounded-2xl bg-sand/60 p-4">
-          <p className="text-sm font-semibold">Invite with a link</p>
+          <form onSubmit={sendInvite} className="mb-4 space-y-2">
+            <p className="text-sm font-semibold">Invite by email</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input type="email" required className="field py-2" placeholder="friend@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} aria-label="Friend's email" />
+              <select className="field py-2 sm:w-36" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as "editor" | "viewer")} aria-label="Access">
+                <option value="editor">Can edit</option>
+                <option value="viewer">Can vote</option>
+              </select>
+              <button type="submit" className="btn-dark py-2">Send</button>
+            </div>
+            {emailState && <p className="text-xs text-ink-soft" aria-live="polite">{emailState}</p>}
+          </form>
+          <p className="text-sm font-semibold">Or invite with a link</p>
           <p className="mt-0.5 text-xs text-muted">Links expire after 14 days. Anyone with the link can join after signing in.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" className="btn-dark py-2" onClick={() => invite("editor")}>{copied === "editor" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied === "editor" ? "Link copied" : "Copy editor link"}</button>

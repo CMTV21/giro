@@ -3,11 +3,12 @@
 import { BarChart3, LogOut, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CURRENCIES, CURRENCY_NAMES } from "@/lib/currency";
 import { AIRPORTS } from "@/lib/airports";
 import { api } from "@/lib/storage";
 import { useSession, type SessionUser } from "./SessionProvider";
+import { VerifyBanner } from "./AccountFlows";
 import { TasteDNA } from "./TasteDNA";
 
 export function AccountView() {
@@ -16,15 +17,19 @@ export function AccountView() {
   const [form, setForm] = useState({ name: "", homeCurrency: "CAD", homeAirport: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string>();
+  // Set while signing out or deleting, so the "not signed in" redirect doesn't hijack navigation.
+  const leaving = useRef(false);
 
   useEffect(() => {
-    if (user === null) router.replace("/login?next=/account");
+    if (user === null && !leaving.current) router.replace("/login?next=/account");
     if (user) setForm({ name: user.name, homeCurrency: user.homeCurrency, homeAirport: user.homeAirport });
   }, [user, router]);
 
   if (!user) return <div className="h-96 animate-pulse rounded-3xl bg-sand" />;
 
   return (
+    <>
+    <VerifyBanner />
     <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
       <div className="space-y-6">
         <form
@@ -68,7 +73,7 @@ export function AccountView() {
           {user.isAdmin && (
             <Link href="/admin/revenue" className="btn-ghost w-full justify-start"><BarChart3 className="h-4 w-4" /> Partner revenue dashboard</Link>
           )}
-          <button type="button" className="btn-ghost w-full justify-start" onClick={async () => { await signOut(); router.push("/"); }}>
+          <button type="button" className="btn-ghost w-full justify-start" onClick={async () => { leaving.current = true; await signOut(); router.push("/"); }}>
             <LogOut className="h-4 w-4" /> Sign out
           </button>
           <button
@@ -76,6 +81,7 @@ export function AccountView() {
             className="btn-ghost w-full justify-start text-brand-dark"
             onClick={async () => {
               if (!confirm("Delete your account? Trips you own are deleted for everyone, and this can't be undone.")) return;
+              leaving.current = true;
               await api("/api/me", { method: "DELETE" });
               await signOut();
               router.push("/");
@@ -87,5 +93,6 @@ export function AccountView() {
       </div>
       <TasteDNA />
     </div>
+    </>
   );
 }

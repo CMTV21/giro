@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "PGLITE_DIR=memory:// node --conditions=react-server --experimental-strip-types --test tests/*.test.ts",
+    "test": "NODE_ENV=test PGLITE_DIR=memory:// node --conditions=react-server --experimental-strip-types --test tests/*.test.ts",
     "catalog:draft": "node --experimental-strip-types scripts/draft-destination.ts",
     "catalog:promote": "node --experimental-strip-types scripts/promote-destination.ts"
   },

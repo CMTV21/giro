@@ -16,6 +16,7 @@ export interface User {
   name: string;
   homeCurrency: Currency;
   homeAirport: string;
+  emailVerified: boolean;
   isAdmin: boolean;
 }
 
@@ -25,6 +26,7 @@ interface UserRow {
   name: string;
   home_currency: string;
   home_airport: string;
+  email_verified_at?: Date | string | null;
 }
 
 export const newId = (bytes = 9) => randomBytes(bytes).toString("base64url");
@@ -45,6 +47,7 @@ export function toUser(row: UserRow): User {
     name: row.name,
     homeCurrency: isCurrency(row.home_currency) ? row.home_currency : "CAD",
     homeAirport: row.home_airport,
+    emailVerified: Boolean(row.email_verified_at),
     isAdmin: adminEmails().has(row.email),
   };
 }
@@ -108,7 +111,7 @@ export async function userFromToken(token: string | undefined): Promise<User | u
   if (!token) return undefined;
   const db = await getDb();
   const [row] = await db.query<UserRow>(
-    `select u.id, u.email, u.name, u.home_currency, u.home_airport
+    `select u.id, u.email, u.name, u.home_currency, u.home_airport, u.email_verified_at
        from sessions s join users u on u.id = s.user_id
       where s.id = $1 and s.expires_at > now()`,
     [sha256(token)],

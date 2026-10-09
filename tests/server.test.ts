@@ -144,3 +144,53 @@ test("database URLs from Neon are cleaned of libpq-only options", async () => {
   const out = cleanDatabaseUrl("postgresql://user:pw@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
   assert.equal(out, "postgresql://user:pw@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require");
 });
+
+test("password reset: single-use link, signs out old sessions, no account enumeration", async () => {
+  const { outbox } = await import("../src/server/email.ts");
+  const { requestPasswordReset, resetPassword } = await import("../src/server/users.ts");
+  const user = await signup({ email: "reset@example.com", password: "original password", name: "Rae" });
+  const { token: oldSession } = await createSession(user.id);
+
+  assert.equal(await requestPasswordReset("nobody-here@example.com", "9.9.9.9"), undefined, "unknown emails look identical to callers");
+  const before = outbox.length;
+  await requestPasswordReset("RESET@example.com", "9.9.9.9");
+  assert.equal(outbox.length, before + 1);
+  const mail = outbox.at(-1)!;
+  assert.equal(mail.to, "reset@example.com");
+  const token = mail.text.match(/\/reset\/([A-Za-z0-9_-]+)/)![1];
+
+  await assert.rejects(resetPassword(token, "short"), status(400));
+  const updated = await resetPassword(token, "brand new password");
+  assert.ok(updated.emailVerified, "following an emailed link verifies the address");
+  await assert.rejects(resetPassword(token, "another new password"), status(410), "links work once");
+  assert.equal(await userFromToken(oldSession), undefined, "old sessions are revoked");
+  await assert.rejects(login({ email: "reset@example.com", password: "original password" }, "9.9.9.9"), status(401));
+  assert.equal((await login({ email: "reset@example.com", password: "brand new password" }, "9.9.9.9")).id, user.id);
+
+  // Requesting again revokes the previous unused link.
+  await requestPasswordReset("reset@example.com", "9.9.9.9");
+  const first = outbox.at(-1)!.text.match(/\/reset\/([A-Za-z0-9_-]+)/)![1];
+  await requestPasswordReset("reset@example.com", "9.9.9.9");
+  await assert.rejects(resetPassword(first, "yet another password"), status(410));
+});
+
+test("email verification marks the account verified", async () => {
+  const { outbox } = await import("../src/server/email.ts");
+  const { confirmEmail, sendVerification } = await import("../src/server/users.ts");
+  const user = await signup({ email: "verify@example.com", password: "verify me please", name: "Vee <script>" });
+  assert.equal(user.emailVerified, false);
+  await sendVerification(user);
+  const mail = outbox.at(-1)!;
+  const token = mail.text.match(/\/verify\/([A-Za-z0-9_-]+)/)![1];
+  await confirmEmail(token);
+  const { token: session } = await createSession(user.id);
+  assert.equal((await userFromToken(session))?.emailVerified, true);
+  await assert.rejects(confirmEmail(token), status(410));
+});
+
+test("email templates escape user-provided text", async () => {
+  const { inviteEmail } = await import("../src/server/email.ts");
+  const m = inviteEmail("https://giro.app/join/x", "<b>Eve</b>", "Trip <img src=x onerror=alert(1)>", "viewer");
+  assert.ok(!m.html.includes("<img"));
+  assert.ok(m.html.includes("&lt;b&gt;Eve&lt;/b&gt;"));
+});

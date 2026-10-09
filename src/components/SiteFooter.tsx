@@ -23,9 +23,16 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-line">
-        <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-muted sm:px-6">
-          Prices are estimates. Booking happens on partner sites, and Giro may earn a commission at no extra cost to you. © {new Date().getFullYear()} Giro.
-        </p>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-5 text-xs text-muted sm:px-6">
+          <p>
+            Prices are estimates. Booking happens on partner sites, and Giro may earn a commission at no extra cost to you. © {new Date().getFullYear()} Giro.
+          </p>
+          <nav className="flex gap-4 sm:ml-auto">
+            <Link href="/privacy" className="hover:text-ink">Privacy</Link>
+            <Link href="/terms" className="hover:text-ink">Terms</Link>
+            <Link href="/affiliate-disclosure" className="hover:text-ink">Affiliate disclosure</Link>
+          </nav>
+        </div>
       </div>
     </footer>
   );

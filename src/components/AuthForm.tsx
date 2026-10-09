@@ -53,6 +53,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <label className="label" htmlFor="password">Password</label>
         <input id="password" type="password" className="field" autoComplete={mode === "signup" ? "new-password" : "current-password"} value={fields.password} onChange={set("password")} minLength={mode === "signup" ? 10 : undefined} required />
         {mode === "signup" && <p className="mt-1.5 text-xs text-muted">At least 10 characters. A short phrase works well.</p>}
+        {mode === "login" && <Link href="/forgot" className="mt-1.5 inline-block text-xs font-semibold text-brand">Forgot password?</Link>}
       </div>
       {mode === "signup" && (
         <div>
@@ -74,6 +75,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </Link>
       </p>
       <p className="text-center text-xs text-muted">Trips and preferences from this browser move to your account automatically.</p>
+      {mode === "signup" && (
+        <p className="text-center text-xs text-muted">
+          By creating an account you agree to the <Link href="/terms" className="underline">Terms</Link> and <Link href="/privacy" className="underline">Privacy Policy</Link>.
+        </p>
+      )}
     </form>
   );
 }

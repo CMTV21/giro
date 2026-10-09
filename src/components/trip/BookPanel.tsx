@@ -94,7 +94,7 @@ export function BookPanel({ trip }: { trip: Trip }) {
       </Group>
 
       <p className="text-xs text-muted">
-        Giro links you to partner sites to complete your booking. Prices and availability are set by each partner. Giro may earn a commission at no extra cost to you.
+        Giro links you to partner sites to complete your booking. Prices and availability are set by each partner. Giro may earn a commission at no extra cost to you. <a href="/affiliate-disclosure" className="underline">How this works</a>.
       </p>
     </div>
   );

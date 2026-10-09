@@ -81,4 +81,16 @@ export const MIGRATIONS: string[][] = [
     )`,
     `create index clicks_created_idx on clicks(created_at)`,
   ],
+  [
+    `alter table users add column email_verified_at timestamptz`,
+    `create table auth_tokens (
+      token_hash text primary key,
+      user_id text not null references users(id) on delete cascade,
+      purpose text not null check (purpose in ('reset', 'verify')),
+      expires_at timestamptz not null,
+      used_at timestamptz,
+      created_at timestamptz not null default now()
+    )`,
+    `create index auth_tokens_user_idx on auth_tokens(user_id, purpose)`,
+  ],
 ];

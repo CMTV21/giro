@@ -179,6 +179,12 @@ export async function createInvite(tripId: string, userId: string, role: "editor
   return token;
 }
 
+export async function tripTitle(tripId: string): Promise<string> {
+  const db = await getDb();
+  const [row] = await db.query<{ data: unknown }>("select data from trips where id = $1", [tripId]);
+  return row ? (json(row.data) as Trip).title : "a trip";
+}
+
 /** Join a trip from an invite link. Never downgrades an existing member. */
 export async function acceptInvite(token: string, userId: string): Promise<{ tripId: string; title: string }> {
   const db = await getDb();

@@ -34,6 +34,10 @@ Configuration lives in `.env.local` (see `.env.example`). Everything is optional
 | `ADMIN_EMAILS` | Comma-separated emails allowed to see `/admin/revenue`. |
 | `NEXT_PUBLIC_*` partner IDs | Appended to outbound links once you're accepted into each affiliate program. |
 | `OPEN_METEO_API_KEY` | Commercial weather API for Giro Live (Open-Meteo is free for non-commercial use only). |
+| `RESEND_API_KEY` | Sends password-reset, email-confirmation and invite emails via Resend. Without it, development prints emails to the console and production offers copyable invite links. |
+| `EMAIL_FROM` | Sender address once your domain is verified in Resend, e.g. `Giro <hello@yourdomain.com>`. |
+| `APP_URL` | Public address used in email links. Defaults to the Vercel production URL; it is never taken from request headers. |
+| `CONTACT_EMAIL` | Privacy and legal contact shown on `/privacy`, `/terms` and `/affiliate-disclosure` (redeploy after changing). |
 
 ## Growing the city catalog
 
@@ -71,7 +75,9 @@ scripts/                catalog draft/promote pipeline
 tests/                  node:test suites (server tests run against in-memory Postgres)
 ```
 
-**Security notes.** Passwords use scrypt with per-user salts. Sessions are random tokens stored only as SHA-256 hashes, in `HttpOnly`, `SameSite=Lax` cookies (`Secure` in production). Every state-changing request must be same-origin, which defends against CSRF. Sign-in and sign-up are rate-limited in the database. Trip documents are schema-validated and size-capped on every write. Shared trips use optimistic concurrency, so concurrent edits are reported rather than lost. `/go` redirects only to allow-listed partner hosts over HTTPS. Share links and imports are treated as untrusted input.
+**Legal pages.** `/privacy` (written to PIPEDA principles), `/terms` and `/affiliate-disclosure` describe what Giro actually collects and does. They're a strong starting point, but have a Canadian lawyer review them before public launch.
+
+**Security notes.** Passwords use scrypt with per-user salts. Sessions are random tokens stored only as SHA-256 hashes, in `HttpOnly`, `SameSite=Lax` cookies (`Secure` in production). Every state-changing request must be same-origin, which defends against CSRF. Sign-in, sign-up, password reset and invite emails are rate-limited in the database. Reset and confirmation links are single-use, stored hashed, and expire after 1 hour and 7 days respectively. Resetting a password signs out every session. The reset form never reveals whether an email has an account. Trip documents are schema-validated and size-capped on every write. Shared trips use optimistic concurrency, so concurrent edits are reported rather than lost. `/go` redirects only to allow-listed partner hosts over HTTPS. Share links and imports are treated as untrusted input.
 
 ## About the integrations
 

@@ -12,6 +12,7 @@ export interface SessionUser {
   name: string;
   homeCurrency: Currency;
   homeAirport: string;
+  emailVerified: boolean;
   isAdmin: boolean;
 }
 
