@@ -55,6 +55,12 @@ export function parseSearch(json: unknown): { title: string; snippet?: string }[
   return Array.isArray(s) ? s.filter((r) => typeof r.title === "string").map((r) => ({ title: r.title as string, snippet: typeof r.snippet === "string" ? r.snippet : undefined })) : [];
 }
 
+/**
+ * A Wikimedia Commons image. Wikipedia serves thumbnails from `thumb.wikimedia.org` (with tracking
+ * parameters) and originals from `upload.wikimedia.org`; both use the same `/wikipedia/commons/` paths.
+ */
+const COMMONS = /^https:\/\/(?:upload|thumb)\.wikimedia\.org\/wikipedia\/commons\//;
+
 export function parseSummary(json: unknown): PlaceInfo | undefined {
   const j = json as { type?: string; title?: string; description?: string; extract?: string; coordinates?: { lat?: number; lon?: number }; thumbnail?: { source?: string }; content_urls?: { desktop?: { page?: string } } };
   if (!j || typeof j !== "object" || j.type === "disambiguation" || typeof j.extract !== "string" || !j.extract.trim()) return undefined;
@@ -66,7 +72,7 @@ export function parseSummary(json: unknown): PlaceInfo | undefined {
     extract: j.extract.trim().slice(0, 1200),
     url: typeof url === "string" && url.startsWith("https://") ? url : undefined,
     // Commons files are freely licensed; English-Wikipedia uploads can be non-free (fair use), so skip those.
-    thumbnail: typeof thumb === "string" && thumb.startsWith("https://upload.wikimedia.org/wikipedia/commons/") ? thumb : undefined,
+    thumbnail: typeof thumb === "string" && COMMONS.test(thumb) ? thumb : undefined,
     lat: typeof j.coordinates?.lat === "number" ? j.coordinates.lat : undefined,
     lon: typeof j.coordinates?.lon === "number" ? j.coordinates.lon : undefined,
     source: "wikipedia",
@@ -89,7 +95,7 @@ export function nearCity(point: { lat?: number; lon?: number }, city: { lat: num
 
 /** "File:Name.jpg" for a Commons image or thumbnail URL. */
 export function commonsFile(url: string): string | undefined {
-  const m = url.match(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/);
+  const m = url.match(/^https:\/\/(?:upload|thumb)\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/);
   if (!m) return undefined;
   try {
     return `File:${decodeURIComponent(m[1])}`;

@@ -15,6 +15,8 @@ import { appUrl } from "./email.ts";
  */
 
 const HIT_DAYS = 30;
+/** Bump to refetch every place, e.g. after a parsing fix (v2: photos from thumb.wikimedia.org). */
+const CACHE_VERSION = "|v2";
 const MISS_DAYS = 7;
 const UA = () => `GiroTripPlanner/1.0 (${appUrl()}${process.env.CONTACT_EMAIL ? `; ${process.env.CONTACT_EMAIL}` : ""})`;
 
@@ -45,10 +47,9 @@ export async function fetchPlace(title: string, city: string, opts: LookupOption
       const raw = await get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pick.replaceAll(" ", "_"))}`);
       const summary = parseSummary(raw);
       if (summary && nearCity(summary, cityPoint, dayTrip) && (!opts.strict || (summary.lat !== undefined && cityPoint))) info = summary;
-      if (summary && !summary.thumbnail) {
-        const r = raw as { thumbnail?: { source?: unknown }; originalimage?: { source?: unknown } };
-        console.warn("place photo skipped", { title: pick, thumbnail: r?.thumbnail?.source ?? null, original: r?.originalimage?.source ?? null, keys: Object.keys(r ?? {}) });
-      }
+      // Wikimedia has moved image hosts before; flag an unrecognised one so photos don't vanish silently.
+      const src = (raw as { thumbnail?: { source?: unknown } })?.thumbnail?.source;
+      if (typeof src === "string" && !/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(src)) console.warn("place photo from unrecognised host", pick, src);
     }
   } catch (err) {
     console.warn("wikipedia lookup failed", title, String(err));
@@ -135,7 +136,7 @@ const fromRow = (r: Row): PlaceInfo => ({
  * "History & facts" panel and the printable guide), not for every photo on the page.
  */
 export async function lookupPlace(title: string, city: string, opts: LookupOptions & { facts?: boolean } = {}, get?: Fetcher): Promise<PlaceInfo> {
-  const key = placeKey(title, city) + (opts.strict ? "|strict" : "");
+  const key = placeKey(title, city) + (opts.strict ? "|strict" : "") + CACHE_VERSION;
   const db = await getDb();
   const [cached] = await db.query<Row>(
     `select title, description, extract, url, thumbnail, lat, lon, facts, photo, source from place_info

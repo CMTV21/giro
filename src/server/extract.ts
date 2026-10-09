@@ -53,14 +53,22 @@ function fileBlock(mime: SafeMime, bytes: Uint8Array) {
 }
 
 async function extract<T extends z.ZodType>(schema: T, instruction: string, mime: SafeMime, bytes: Uint8Array, client: Anthropic): Promise<z.infer<T>> {
-  const message = await client.beta.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 4000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "low", format: betaZodOutputFormat(schema) },
-    messages: [{ role: "user", content: [fileBlock(mime, bytes), { type: "text", text: instruction }] }],
-  });
+  let message;
+  try {
+    message = await client.beta.messages.parse({
+      model: AI_MODEL,
+      max_tokens: 4000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "low", format: betaZodOutputFormat(schema) },
+      messages: [{ role: "user", content: [fileBlock(mime, bytes), { type: "text", text: instruction }] }],
+    });
+  } catch (err) {
+    // An API-side problem (credits, rate limits, outages) isn't the traveller's fault; say so plainly.
+    if (!(err instanceof Anthropic.APIError)) throw err;
+    console.error("document reading failed", err.status, err.message);
+    throw new HttpError(503, "ai_unavailable", "Reading documents isn't available right now. Please try again later.");
+  }
   if (message.stop_reason === "refusal") throw new HttpError(422, "unreadable", "We couldn't read that document.");
   const parsed = message.parsed_output as z.infer<T> | null | undefined;
   if (!parsed) throw new HttpError(422, "unreadable", "We couldn't read that document. Try a clearer photo.");

@@ -24,12 +24,16 @@ test("parses Wikipedia summaries safely", () => {
   assert.equal(parseSummary({ type: "disambiguation", extract: "x" }), undefined);
   assert.equal(parseSummary({ extract: "x", thumbnail: { source: "javascript:alert(1)" } })?.thumbnail, undefined, "only Wikimedia image URLs");
   assert.equal(parseSummary({ extract: "x", thumbnail: { source: "https://upload.wikimedia.org/wikipedia/en/a/ab/Logo.png" } })?.thumbnail, undefined, "no non-free English-Wikipedia uploads");
+  const thumb = "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Jer%C3%B3nimos.jpg/330px-Jer%C3%B3nimos.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail";
+  assert.equal(parseSummary({ extract: "x", thumbnail: { source: thumb } })?.thumbnail, thumb, "Commons thumbnails from thumb.wikimedia.org");
+  assert.equal(parseSummary({ extract: "x", thumbnail: { source: "https://thumb.wikimedia.org/wikipedia/en/thumb/a/ab/Logo.png/330px-Logo.png" } })?.thumbnail, undefined, "no non-free uploads on the thumbnail host either");
 });
 
 test("Commons photo credits", () => {
   assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Past%C3%A9is_de_Nata.jpg/320px-Past%C3%A9is_de_Nata.jpg"), "File:Pastéis_de_Nata.jpg");
   assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/5/5f/Nata.jpg"), "File:Nata.jpg");
   assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/en/5/5f/Nata.jpg"), undefined);
+  assert.equal(commonsFile("https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Jer%C3%B3nimos.jpg/330px-Jer%C3%B3nimos.jpg?utm_source=en.wikipedia.org"), "File:Jerónimos.jpg");
   const credit = parseCommonsCredit({ query: { pages: [{ imageinfo: [{ extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:A">A &amp; B</a>' }, LicenseShortName: { value: "CC BY 2.0" } } }] }] } }, "File:Nata.jpg");
   assert.deepEqual(credit, { page: "https://commons.wikimedia.org/wiki/File:Nata.jpg", author: "A & B", license: "CC BY 2.0" });
   assert.deepEqual(parseCommonsCredit(undefined, "File:Nata.jpg"), { page: "https://commons.wikimedia.org/wiki/File:Nata.jpg", author: undefined, license: undefined });
