@@ -29,6 +29,21 @@ export function resetDbForTests() {
   instance = undefined;
 }
 
+/**
+ * Neon's copy-paste strings include libpq-only options (e.g. channel_binding) that postgres.js
+ * would forward to the server as unknown settings, failing the connection. sslmode is kept;
+ * postgres.js understands it.
+ */
+export function cleanDatabaseUrl(raw: string): string {
+  try {
+    const url = new URL(raw.trim());
+    for (const key of ["channel_binding", "gssencmode", "connect_timeout"]) url.searchParams.delete(key);
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 type Runner = { query: <T>(text: string, params: unknown[]) => Promise<T[]> };
 
 /** A Db bound to an open transaction: nested tx() calls join it rather than opening another. */
@@ -41,7 +56,7 @@ async function connect(): Promise<Db> {
   const url = process.env.DATABASE_URL;
   if (url) {
     const { default: postgres } = await import("postgres");
-    const sql = postgres(url, { max: 5, idle_timeout: 20, prepare: false });
+    const sql = postgres(cleanDatabaseUrl(url), { max: 5, idle_timeout: 20, prepare: false });
     const run = (s: { unsafe: (q: string, p: never[]) => Promise<unknown> }): Runner => ({
       query: async <T,>(text: string, params: unknown[]) => (await s.unsafe(text, params as never[])) as T[],
     });

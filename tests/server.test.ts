@@ -138,3 +138,9 @@ test("click tracker only redirects to partner sites and logs commission", async 
   assert.equal(booking.clicks, 1);
   assert.ok(Math.abs(booking.expectedUSD - 1000 * 0.04 * 0.04) < 0.001);
 });
+
+test("database URLs from Neon are cleaned of libpq-only options", async () => {
+  const { cleanDatabaseUrl } = await import("../src/server/db.ts");
+  const out = cleanDatabaseUrl("postgresql://user:pw@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
+  assert.equal(out, "postgresql://user:pw@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require");
+});
