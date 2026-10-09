@@ -36,6 +36,8 @@ export const AFFILIATES: AffiliateProgram[] = [
   { provider: "Kayak", hosts: ["kayak.com", "kayak.ca", "kayak.co.uk", "kayak.com.au"], commission: { model: "per_click", usd: 0.2 }, assumedConversion: 0, program: "KAYAK affiliate network" },
   { provider: "Google Flights", hosts: ["google.com"], commission: { model: "none" }, assumedConversion: 0, program: "No affiliate program; drives trust, not revenue" },
   { provider: "Airbnb", hosts: ["airbnb.com", "airbnb.ca", "airbnb.co.uk", "airbnb.com.au"], commission: { model: "none" }, assumedConversion: 0, program: "No public affiliate program" },
+  // Tripadvisor's affiliate program runs through partner networks; add its parameters here once approved.
+  { provider: "Tripadvisor", hosts: ["tripadvisor.com", "tripadvisor.ca", "tripadvisor.co.uk", "tripadvisor.com.au"], commission: { model: "none" }, assumedConversion: 0, program: "Reviews link; apply via the Tripadvisor affiliate program to earn on hotel clicks" },
   { provider: "Google Maps", hosts: ["google.com"], commission: { model: "none" }, assumedConversion: 0, program: "Utility link" },
 ];
 

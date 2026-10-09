@@ -107,6 +107,18 @@ export const TripSchema = z.object({
   packed: z.array(str(200)).max(60).optional(),
   flights: z.array(FlightSchema).max(12).optional(),
   parked: z.array(ActivitySchema.extend({ city: str(80), reason: str(200).optional() })).max(100).optional(),
+  food: z
+    .array(
+      z.object({
+        city: str(80),
+        dishes: z.array(z.object({ name: str(80), what: str(300), wiki: str(120).optional() })).max(12),
+        restaurants: z
+          .array(z.object({ name: str(100), area: str(100), kind: str(80), price: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]), meal: z.enum(["breakfast", "lunch", "dinner"]), why: str(300), book: z.boolean().optional() }))
+          .max(15),
+      }),
+    )
+    .max(6)
+    .optional(),
 });
 
 export function parseTrip(value: unknown): Trip | undefined {

@@ -2,14 +2,16 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArchiveRestore, GripVertical, Lightbulb, Plus, X } from "lucide-react";
+import { ArchiveRestore, GripVertical, Lightbulb, Plus, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { reviewsLink, trackedHref } from "@/lib/booking";
 import { formatDate } from "@/lib/dates";
 import { ideasFor, type Idea } from "@/lib/ideas";
-import { money } from "@/lib/money";
+import { money, tripFx } from "@/lib/money";
 import { loadTaste } from "@/lib/taste-client";
 import type { Interest, Trip } from "@/lib/types";
 import { CATEGORY_META, INTEREST_META } from "../meta";
+import { PlacePhoto } from "./PlacePhoto";
 
 export const ideaDragId = (id: string) => `idea::${id}`;
 
@@ -65,6 +67,9 @@ function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss }: { idea: Idea
         <div className="min-w-0 flex-1">
           <p className="text-sm leading-snug font-semibold">{idea.title}</p>
           <p className="mt-0.5 text-xs text-muted">{[idea.area, `${idea.durationHrs}h`, idea.estCost ? money(trip, idea.estCost, true) : "Free"].filter(Boolean).join(" · ")}</p>
+          <a href={trackedHref(reviewsLink(idea.title, idea.city, tripFx(trip).currency), trip.id)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-ink-soft hover:text-ink">
+            <Star className="h-3 w-3" /> Reviews
+          </a>
           {idea.origin === "parked" && idea.reason && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"><ArchiveRestore className="h-3 w-3" /> {idea.reason}</p>
           )}

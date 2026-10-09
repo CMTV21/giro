@@ -38,12 +38,12 @@ export async function stayPoint(stay: Stay | undefined): Promise<{ lat: number; 
 }
 
 /** History and coordinates for each timed stop of a day, in schedule order. */
-export async function resolveStops(day: Day, items: ScheduledItem[]): Promise<ResolvedStop[]> {
+export async function resolveStops(day: Day, items: ScheduledItem[], opts: { facts?: boolean } = {}): Promise<ResolvedStop[]> {
   const acts = items.filter((i) => i.kind === "activity" && i.activity && i.activity.category !== "transit" && i.activity.category !== "free");
   return Promise.all(
     acts.map(async (item) => {
       const a = item.activity!;
-      const info = await placeInfo(a, day.city);
+      const info = await placeInfo(a, day.city, { ...opts, strict: a.ref?.startsWith("food:") });
       return { item, info: a.place ? { ...info, lat: a.place.lat, lon: a.place.lon } : info };
     }),
   );

@@ -1,4 +1,5 @@
 import type { Currency, FxSnapshot } from "./currency.ts";
+import type { CityFood } from "./food.ts";
 
 export const INTERESTS = [
   "culture",
@@ -156,4 +157,6 @@ export interface Trip {
   packed?: string[];
   flights?: Flight[];
   parked?: ParkedIdea[];
+  /** Giro AI's dishes and restaurants for cities outside the curated catalog. */
+  food?: Omit<CityFood, "source">[];
 }

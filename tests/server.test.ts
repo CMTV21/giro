@@ -195,23 +195,43 @@ test("email templates escape user-provided text", async () => {
   assert.ok(m.html.includes("&lt;b&gt;Eve&lt;/b&gt;"));
 });
 
-test("place lookups are cached, including misses", async () => {
+test("place lookups are cached, including misses, with credited Commons photos", async () => {
   const { lookupPlace } = await import("../src/server/places.ts");
   let calls = 0;
+  const thumb = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Torre_de_Bel%C3%A9m.jpg/320px-Torre_de_Bel%C3%A9m.jpg";
   const fake = async (url: string) => {
     calls++;
     if (url.includes("list=search")) return { query: { search: [{ title: "Belém Tower" }] } };
-    if (url.includes("/page/summary/")) return { type: "standard", title: "Belém Tower", extract: "Belém Tower is a 16th-century fortification in Lisbon.", coordinates: { lat: 38.6916, lon: -9.216 } };
+    if (url.includes("/page/summary/")) return { type: "standard", title: "Belém Tower", extract: "Belém Tower is a 16th-century fortification in Lisbon.", coordinates: { lat: 38.6916, lon: -9.216 }, thumbnail: { source: thumb } };
+    if (url.includes("commons.wikimedia.org")) return { query: { pages: [{ imageinfo: [{ extmetadata: { Artist: { value: '<a href="//x">Jane Doe</a>' }, LicenseShortName: { value: "CC BY-SA 4.0" } } }] }] } };
     return [];
   };
-  const a = await lookupPlace("Belém Tower", "Lisbon", false, fake);
+  const a = await lookupPlace("Belém Tower", "Lisbon", {}, fake);
   assert.equal(a.source, "wikipedia");
+  assert.equal(a.thumbnail, thumb);
+  assert.deepEqual(a.photo, { page: "https://commons.wikimedia.org/wiki/File:Torre_de_Bel%C3%A9m.jpg", author: "Jane Doe", license: "CC BY-SA 4.0" });
+  assert.equal(a.facts, undefined, "facts aren't generated unless asked for");
   const before = calls;
-  const b = await lookupPlace("Belém Tower", "Lisbon", false, fake);
+  const b = await lookupPlace("Belém Tower", "Lisbon", { facts: true }, fake);
   assert.equal(calls, before, "served from cache");
   assert.equal(b.title, "Belém Tower");
-  const miss = await lookupPlace("Nowhere special", "Lisbon", false, async () => ({ query: { search: [] } }));
+  assert.equal(b.photo?.author, "Jane Doe");
+  const miss = await lookupPlace("Nowhere special", "Lisbon", {}, async () => ({ query: { search: [] } }));
   assert.equal(miss.source, "none");
+});
+
+test("strict lookups (restaurants) need an article with coordinates near the city", async () => {
+  const { lookupPlace } = await import("../src/server/places.ts");
+  const person = async (url: string) => {
+    if (url.includes("list=search")) return { query: { search: [{ title: "Ramiro Corrales" }] } };
+    if (url.includes("/page/summary/")) return { type: "standard", title: "Ramiro Corrales", extract: "Ramiro Corrales is a retired American soccer player.", thumbnail: { source: "https://upload.wikimedia.org/wikipedia/commons/a/ab/R.jpg" } };
+    throw new Error("geocoding is skipped in strict mode");
+  };
+  const loose = await lookupPlace("Cervejaria Ramiro", "Lisbon", {}, person).catch(() => undefined);
+  assert.ok(loose, "non-strict lookups still return");
+  const strict = await lookupPlace("Cervejaria Ramiro", "Lisbon", { strict: true }, person);
+  assert.equal(strict.thumbnail, undefined, "no photo of a namesake");
+  assert.equal(strict.extract, undefined);
 });
 
 test("receipts: members only, type-checked by content, attached to expenses", async () => {

@@ -19,6 +19,8 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Ideas**: drag attractions into any day; removed or displaced stops wait here instead of disappearing |
 | | **History & facts** for each stop (Wikipedia, attributed), **day maps**, and a **printable sightseeing guide** |
 | | **Receipts** on shared expenses, read by Claude to fill in the amount and currency |
+| | **Photos** of stops, ideas and dishes (freely licensed Wikimedia Commons images, photographer credited) and **Tripadvisor reviews** links |
+| | **Eat & drink**: must-try dishes and hand-picked restaurants for all 26 catalog cities (Giro AI writes one for other cities), with live Tripadvisor rankings and one-tap "add to a day" at the right meal |
 
 ## Quick start
 
@@ -81,7 +83,7 @@ scripts/                catalog draft/promote pipeline
 tests/                  node:test suites (server tests run against in-memory Postgres)
 ```
 
-**Planner internals.** `lib/schedule.ts` turns each day into clock times and re-fits trips around flights (`fitToFlights`). `lib/plan-edit.ts` holds the drag-and-drop operations, `lib/ideas.ts` the per-city suggestions, `server/places.ts` the Wikipedia/OpenStreetMap lookups (cached in Postgres), `server/extract.ts` the Claude readers for confirmations and receipts, and `server/receipts.ts` receipt storage. Receipts are identified by their bytes, served only to trip members with `nosniff` and a sandboxing CSP, and capped at 4 MB. Phone photos are shrunk in the browser first.
+**Planner internals.** `lib/schedule.ts` turns each day into clock times and re-fits trips around flights (`fitToFlights`). `lib/plan-edit.ts` holds the drag-and-drop operations, `lib/ideas.ts` the per-city suggestions, `server/places.ts` the Wikipedia/OpenStreetMap lookups (cached in Postgres; photos only from Wikimedia Commons with author and licence, and "did you know" facts generated only when the history panel or guide asks), `src/data/food.ts` the curated food guide, `server/extract.ts` the Claude readers for confirmations and receipts, and `server/receipts.ts` receipt storage. Receipts are identified by their bytes, served only to trip members with `nosniff` and a sandboxing CSP, and capped at 4 MB. Phone photos are shrunk in the browser first.
 
 **Legal pages.** `/privacy` (written to PIPEDA principles), `/terms` and `/affiliate-disclosure` describe what Giro actually collects and does. They're a strong starting point, but have a Canadian lawyer review them before public launch.
 

@@ -2,6 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, resolveFx, tripTitle } from "./curate.ts";
+import { FOOD } from "../data/food.ts";
+import { findDestination } from "./destinations.ts";
+import type { Price } from "./food.ts";
 import type { FxSnapshot } from "./currency.ts";
 import type { TasteProfile } from "./taste.ts";
 import { INTERESTS, type Activity, type Day, type Trip, type TripRequest } from "./types.ts";
@@ -33,6 +36,25 @@ const PlanSchema = z.object({
   stays: z.array(z.object({ city: z.string(), area: z.string(), why: z.string() })),
   tips: z.array(z.string()),
   packing: z.array(z.string()),
+  food: z
+    .array(
+      z.object({
+        city: z.string(),
+        dishes: z.array(z.object({ name: z.string().describe("Dish name as locals say it"), what: z.string().describe("One sentence for a visitor") })),
+        restaurants: z.array(
+          z.object({
+            name: z.string().describe("A real, well-established restaurant, café, market or food street"),
+            area: z.string(),
+            kind: z.string().describe("Cuisine or format, e.g. 'Seafood tavern'"),
+            price: z.number().int().min(1).max(4).describe("1 = cheap eats … 4 = fine dining"),
+            meal: z.enum(["breakfast", "lunch", "dinner"]),
+            why: z.string().describe("One sentence: what to order or why it's worth it"),
+            book: z.boolean().describe("True if reservations are usually needed"),
+          }),
+        ),
+      }),
+    )
+    .describe("Only for the cities listed under 'Food guide needed'; otherwise an empty array"),
 });
 
 const SYSTEM = `You are Giro's senior travel curator. You design realistic, delightful day-by-day itineraries.
@@ -75,6 +97,8 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
   const fx = resolveFx(req, opts.fx);
   const { legs, days: fallbackDays, lines } = skeleton(req, opts.taste);
 
+  // Catalog cities already have a curated food guide.
+  const needFood = [...new Set(legs.map((l) => l.city))].filter((c) => !FOOD[findDestination(c)?.slug ?? ""]);
   const brief = [
     `Destinations (in order, with nights): ${legs.map((l) => `${l.city} (${l.nights} nights)`).join(" → ")}`,
     `Travelling from: ${req.origin || "not specified"}`,
@@ -93,6 +117,9 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
     ...lines,
     "",
     `Return one stay recommendation per destination (${legs.map((l) => l.city).join(", ")}).`,
+    needFood.length
+      ? `Food guide needed for: ${needFood.join(", ")}. For each, give 5–6 signature dishes and 6–8 restaurants that have been open for years (local institutions over trendy openings), spanning price levels and meals. Only include places you are confident exist.`
+      : "No food guide is needed; return an empty food array.",
   ]
     .filter((l) => l !== "")
     .join("\n");
@@ -154,6 +181,15 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
     fx,
     packing: plan.packing.length ? plan.packing : packingList(req, legs),
     tips: plan.tips,
+    food: needFood.length
+      ? (plan.food ?? [])
+          .filter((f) => needFood.some((c) => c.toLowerCase() === f.city.toLowerCase()))
+          .map((f) => ({
+            city: needFood.find((c) => c.toLowerCase() === f.city.toLowerCase())!,
+            dishes: f.dishes.slice(0, 8).map((x) => ({ name: x.name.slice(0, 80), what: x.what.slice(0, 300) })),
+            restaurants: f.restaurants.slice(0, 10).map((x) => ({ ...x, name: x.name.slice(0, 100), area: x.area.slice(0, 100), kind: x.kind.slice(0, 80), why: x.why.slice(0, 300), price: Math.min(4, Math.max(1, Math.round(x.price))) as Price })),
+          }))
+      : undefined,
     source: "ai",
     palette: legs[0].destination.palette,
   };

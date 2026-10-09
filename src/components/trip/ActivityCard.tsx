@@ -1,14 +1,15 @@
 "use client";
 
-import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pin, Shuffle, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
+import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pin, Shuffle, Star, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
 import { useState } from "react";
-import { experienceLinks, mapsSearchUrl, trackedHref } from "@/lib/booking";
+import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
 import { formatMoney } from "@/lib/currency";
 import { clock, fromMinutes } from "@/lib/schedule";
 import type { VoteTally } from "@/lib/storage";
 import type { Activity } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
+import { PlacePhoto } from "./PlacePhoto";
 
 export interface ActivityTime {
   start: number;
@@ -58,6 +59,9 @@ export function ActivityCard({
   const isFree = a.category === "free";
   const ticket = a.bookable ? experienceLinks(city, a.title, fx.currency)[0] : undefined;
   const ticketUrl = ticket ? trackedHref({ ...ticket, valueUSD: a.estCost }, tripId) : undefined;
+  const reviewsUrl = !isTransit && !isFree ? trackedHref(reviewsLink(a.title, city, fx.currency), tripId) : undefined;
+  // Restaurants added from the food guide share names with people and other places; match strictly.
+  const restaurant = a.ref?.startsWith("food:");
   const v = actions.votes;
   const [editingTime, setEditingTime] = useState(false);
 
@@ -118,8 +122,13 @@ export function ActivityCard({
             <TriangleAlert className="h-3.5 w-3.5" /> {time.conflict ?? "Runs past the end of the day, or past your flight cut-off."}
           </p>
         )}
-        <h4 className="mt-1.5 text-[17px] leading-snug font-semibold">{a.title}</h4>
-        <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>
+        <div className="mt-1.5 flex gap-3">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[17px] leading-snug font-semibold">{a.title}</h4>
+            <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>
+          </div>
+          {!isTransit && !isFree && <PlacePhoto title={a.title} city={city} durationHrs={a.durationHrs} query={{ strict: restaurant }} className="mt-0.5 h-20 w-24 sm:h-24 sm:w-32" />}
+        </div>
         {a.tip && (
           <p className="mt-2.5 flex gap-2 rounded-xl bg-sand/70 px-3 py-2 text-sm text-ink-soft">
             <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand" /> {a.tip}
@@ -135,6 +144,11 @@ export function ActivityCard({
           {ticketUrl && (
             <a href={ticketUrl} target="_blank" rel="noopener noreferrer sponsored" className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand-dark hover:bg-brand/15">
               <Ticket className="h-3.5 w-3.5" /> Get tickets <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {reviewsUrl && (
+            <a href={reviewsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-sand">
+              <Star className="h-3.5 w-3.5" /> Reviews
             </a>
           )}
           {actions.onVote && !isTransit && (

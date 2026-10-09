@@ -10,7 +10,7 @@ import type { TripRequest } from "./types.ts";
  * attributed. To move to in-app booking, replace a provider's builder with its partner API.
  */
 
-export type ProviderKind = "flights" | "stays" | "cars" | "experiences";
+export type ProviderKind = "flights" | "stays" | "cars" | "experiences" | "reviews";
 
 export interface BookingLink {
   provider: string;
@@ -71,13 +71,14 @@ interface Market {
   kayak: string;
   skyscanner: string;
   airbnb: string;
+  tripadvisor: string;
 }
 const MARKETS: Partial<Record<Currency, Market>> = {
-  CAD: { expedia: "www.expedia.ca", kayak: "www.ca.kayak.com", skyscanner: "www.skyscanner.ca", airbnb: "www.airbnb.ca" },
-  GBP: { expedia: "www.expedia.co.uk", kayak: "www.kayak.co.uk", skyscanner: "www.skyscanner.net", airbnb: "www.airbnb.co.uk" },
-  AUD: { expedia: "www.expedia.com.au", kayak: "www.kayak.com.au", skyscanner: "www.skyscanner.com.au", airbnb: "www.airbnb.com.au" },
+  CAD: { expedia: "www.expedia.ca", kayak: "www.ca.kayak.com", skyscanner: "www.skyscanner.ca", airbnb: "www.airbnb.ca", tripadvisor: "www.tripadvisor.ca" },
+  GBP: { expedia: "www.expedia.co.uk", kayak: "www.kayak.co.uk", skyscanner: "www.skyscanner.net", airbnb: "www.airbnb.co.uk", tripadvisor: "www.tripadvisor.co.uk" },
+  AUD: { expedia: "www.expedia.com.au", kayak: "www.kayak.com.au", skyscanner: "www.skyscanner.com.au", airbnb: "www.airbnb.com.au", tripadvisor: "www.tripadvisor.com.au" },
 };
-const DEFAULT_MARKET: Market = { expedia: "www.expedia.com", kayak: "www.kayak.com", skyscanner: "www.skyscanner.com", airbnb: "www.airbnb.com" };
+const DEFAULT_MARKET: Market = { expedia: "www.expedia.com", kayak: "www.kayak.com", skyscanner: "www.skyscanner.com", airbnb: "www.airbnb.com", tripadvisor: "www.tripadvisor.com" };
 export const marketFor = (currency?: Currency): Market => (currency && MARKETS[currency]) || DEFAULT_MARKET;
 
 /** Resolve a city or code to an IATA code where we know one, otherwise return the input. */
@@ -264,6 +265,24 @@ export function experienceLinks(city: string, query?: string, currency?: Currenc
     },
   ];
 }
+
+/** Reviews and photos from other travellers on Tripadvisor (the traveller's country site). */
+export function reviewsLink(query: string, city: string, currency?: Currency): BookingLink {
+  const q = query.toLowerCase().includes(city.toLowerCase()) ? query : `${query} ${city}`;
+  return {
+    provider: "Tripadvisor",
+    kind: "reviews",
+    label: "Reviews on Tripadvisor",
+    blurb: "Traveller reviews, photos and rankings.",
+    url: withParams(`https://${marketFor(currency).tripadvisor}/Search`, { q }),
+  };
+}
+
+/** Tripadvisor's live restaurant rankings for a city. */
+export const topRestaurantsLink = (city: string, currency?: Currency): BookingLink => ({
+  ...reviewsLink(`restaurants ${city}`, city, currency),
+  label: "Top-rated restaurants on Tripadvisor",
+});
 
 export function mapsSearchUrl(query: string): string {
   return withParams("https://www.google.com/maps/search/", { api: 1, query });

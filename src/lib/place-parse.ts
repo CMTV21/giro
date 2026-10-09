@@ -12,7 +12,16 @@ export interface PlaceInfo {
   lat?: number;
   lon?: number;
   facts?: string[];
+  /** Credit for `thumbnail` (a Wikimedia Commons file, so freely licensed). */
+  photo?: PhotoCredit;
   source: "wikipedia" | "nominatim" | "none";
+}
+
+export interface PhotoCredit {
+  /** Commons file page, where the full licence terms live. */
+  page: string;
+  author?: string;
+  license?: string;
 }
 
 const STOP = new Set(["the", "and", "of", "a", "an", "at", "in", "on", "to", "de", "la", "le", "da", "do", "tour", "walk", "stroll", "visit", "day", "trip", "evening", "night", "sunset", "sunrise", "class", "lesson", "crawl", "hop", "market", "museum", "park", "gardens", "garden", "climb", "ride", "cruise", "show", "dinner", "lunch", "breakfast", "tasting", "food", "street", "old", "town", "historic", "with", "your", "free", "time", "around"]);
@@ -56,7 +65,8 @@ export function parseSummary(json: unknown): PlaceInfo | undefined {
     description: typeof j.description === "string" ? j.description : undefined,
     extract: j.extract.trim().slice(0, 1200),
     url: typeof url === "string" && url.startsWith("https://") ? url : undefined,
-    thumbnail: typeof thumb === "string" && thumb.startsWith("https://upload.wikimedia.org/") ? thumb : undefined,
+    // Commons files are freely licensed; English-Wikipedia uploads can be non-free (fair use), so skip those.
+    thumbnail: typeof thumb === "string" && thumb.startsWith("https://upload.wikimedia.org/wikipedia/commons/") ? thumb : undefined,
     lat: typeof j.coordinates?.lat === "number" ? j.coordinates.lat : undefined,
     lon: typeof j.coordinates?.lon === "number" ? j.coordinates.lon : undefined,
     source: "wikipedia",
@@ -75,4 +85,35 @@ export function nearCity(point: { lat?: number; lon?: number }, city: { lat: num
   if (point.lat === undefined || point.lon === undefined) return true;
   if (!city || !Number.isFinite(city.lat)) return true;
   return distanceKm(city, { lat: point.lat, lon: point.lon }) <= (dayTrip ? 200 : 60);
+}
+
+/** "File:Name.jpg" for a Commons image or thumbnail URL. */
+export function commonsFile(url: string): string | undefined {
+  const m = url.match(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/);
+  if (!m) return undefined;
+  try {
+    return `File:${decodeURIComponent(m[1])}`;
+  } catch {
+    return undefined;
+  }
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
+const plain = (html: string) =>
+  html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, e: string) => ENTITIES[e])
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Author and licence from a Commons imageinfo/extmetadata response. */
+export function parseCommonsCredit(json: unknown, file: string): PhotoCredit {
+  const page = `https://commons.wikimedia.org/wiki/${encodeURIComponent(file.replaceAll(" ", "_")).replace(/%3A/i, ":")}`;
+  const meta = (json as { query?: { pages?: { imageinfo?: { extmetadata?: Record<string, { value?: unknown }> }[] }[] } })?.query?.pages?.[0]?.imageinfo?.[0]?.extmetadata;
+  const text = (k: string) => {
+    const v = meta?.[k]?.value;
+    const t = typeof v === "string" ? plain(v) : "";
+    return t ? t.slice(0, 120) : undefined;
+  };
+  return { page, author: text("Artist"), license: text("LicenseShortName") };
 }

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (limited(ip)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   try {
-    const info = await lookupPlace(title, city, q.get("daytrip") === "1");
+    const info = await lookupPlace(title, city, { dayTrip: q.get("daytrip") === "1", strict: q.get("strict") === "1", facts: q.get("facts") === "1" });
     return NextResponse.json(info, { headers: { "cache-control": "public, max-age=3600, s-maxage=86400" } });
   } catch (err) {
     console.error("place lookup failed", err);

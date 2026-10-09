@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { PlaceInfo } from "@/lib/place-parse";
 import { placeInfo } from "@/lib/places-client";
 import type { Activity } from "@/lib/types";
+import { photoCredit } from "./PlacePhoto";
 
 /** Collapsible "History & facts" for a stop, loaded on first open. */
 export function PlaceFacts({ activity, city }: { activity: Activity; city: string }) {
@@ -12,7 +13,7 @@ export function PlaceFacts({ activity, city }: { activity: Activity; city: strin
   const [info, setInfo] = useState<PlaceInfo>();
 
   useEffect(() => {
-    if (open && !info) placeInfo(activity, city).then(setInfo);
+    if (open && !info) placeInfo(activity, city, { facts: true }).then(setInfo);
   }, [open, info, activity, city]);
 
   return (
@@ -39,8 +40,13 @@ export function PlaceStory({ info, compact }: { info: PlaceInfo; compact?: boole
   return (
     <div className="flex gap-3">
       {info.thumbnail && !compact && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={info.thumbnail} alt="" loading="lazy" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+        <figure className="w-24 shrink-0">
+          <a href={info.photo?.page ?? info.url} target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={info.thumbnail} alt={info.title ?? ""} loading="lazy" className="h-24 w-24 rounded-lg object-cover" />
+          </a>
+          <figcaption className="mt-1 line-clamp-2 text-[10px] leading-tight text-muted">{photoCredit(info.photo)}</figcaption>
+        </figure>
       )}
       <div className="min-w-0 flex-1">
         {info.description && <p className="text-xs font-semibold tracking-wide text-muted uppercase">{info.description}</p>}

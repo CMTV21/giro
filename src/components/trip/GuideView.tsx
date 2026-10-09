@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDate, formatRange } from "@/lib/dates";
+import { foodFor } from "@/lib/food";
 import { clock, dayWindow, scheduleDay, type ScheduledItem } from "@/lib/schedule";
 import { fetchTrip } from "@/lib/storage";
 import { mapStops, resolveStops, stayFor, stayPoint, type MapStop, type ResolvedStop } from "@/lib/stops-client";
@@ -41,7 +42,7 @@ export function GuideView() {
       chosen.map(async (day) => {
         const w = dayWindow(trip, day);
         const items = scheduleDay(trip, day, w);
-        const stops = await resolveStops(day, items);
+        const stops = await resolveStops(day, items, { facts: true });
         return { day, items, notes: w.notes, stops, pins: mapStops(stops), home: await stayPoint(stayFor(trip, day)) };
       }),
     ).then(setDays);
@@ -72,7 +73,7 @@ export function GuideView() {
       {!days ? (
         <p className="animate-pulse text-muted">Gathering maps, history and facts for each stop…</p>
       ) : (
-        days.map((g) => <GuideDaySection key={g.day.index} g={g} trip={trip} />)
+        days.map((g, i) => <GuideDaySection key={g.day.index} g={g} trip={trip} firstInCity={i === 0 || days[i - 1].day.city !== g.day.city} />)
       )}
 
       <footer className="mt-10 border-t border-line pt-4 text-[11px] text-muted">
@@ -82,8 +83,9 @@ export function GuideView() {
   );
 }
 
-function GuideDaySection({ g, trip }: { g: GuideDay; trip: Trip }) {
+function GuideDaySection({ g, trip, firstInCity }: { g: GuideDay; trip: Trip; firstInCity: boolean }) {
   const stay = stayFor(trip, g.day);
+  const dishes = firstInCity ? foodFor(trip, g.day.city).dishes : [];
   let n = 0;
   return (
     <section className="guide-day mb-12">
@@ -144,6 +146,15 @@ function GuideDaySection({ g, trip }: { g: GuideDay; trip: Trip }) {
           );
         })}
       </ol>
+
+      {dishes.length > 0 && (
+        <div className="mt-6 break-inside-avoid rounded-2xl bg-sand/60 p-4">
+          <h3 className="flex items-center gap-2 font-semibold"><UtensilsCrossed className="h-4 w-4 text-brand" /> Taste of {g.day.city}</h3>
+          <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+            {dishes.map((d) => <li key={d.name}><span className="font-semibold">{d.name}</span> <span className="text-ink-soft">· {d.what}</span></li>)}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

@@ -121,4 +121,10 @@ export const MIGRATIONS: string[][] = [
     `create index receipts_trip_idx on receipts(trip_id)`,
     `create index receipts_expense_idx on receipts(expense_id)`,
   ],
+  [
+    `alter table place_info add column photo jsonb`,
+    // Earlier lookups could cache non-free thumbnails and always generated facts; refetch places
+    // (not geocoded addresses) under the new rules.
+    `delete from place_info where key not like 'addr:%'`,
+  ],
 ];

@@ -13,13 +13,16 @@ Giro's wedge is **curation first, booking second**. Most competitors start from 
 - Travel DNA taste profile that learns from behaviour and nudges curation
 - Commission tracking: `/go` click logging, sub-IDs, projected revenue dashboard
 - Catalog pipeline: AI draft → human review → promote, validated by schema tests
+- Planner: flights and stays, clock-time schedules, drag-and-drop ideas, history and facts, day maps, printable guide, receipts
+- Photos for stops and dishes (credited Commons images), Tripadvisor review links, and an Eat & drink guide for every catalog city
 
 ## Next: turn on revenue
 
 1. **Join partner programs.** Booking.com, Expedia Group, GetYourGuide, Viator and Skyscanner (via Impact). Add the IDs to the environment; the dashboard flags missing ones.
 2. **Replace illustrative rates** in `src/lib/affiliates.ts` with contracted terms, and import partner payout reports to compare projected and actual commission per sub-ID.
 3. **Production database.** Point `DATABASE_URL` at managed Postgres (Neon or Supabase both have free tiers) and add daily backups.
-4. **Email.** Verification, password reset and group invites by email (e.g. Resend or Postmark). Today, invites are copy-paste links.
+4. **Tripadvisor affiliate.** Review links already route through `/go`; once approved, add the partner parameters in `src/lib/affiliates.ts` to earn on hotel clicks.
+5. **Restaurant reservations.** OpenTable and TheFork run affiliate programs; a "Reserve" button on food-guide picks marked "Reserve ahead" is a natural next commission stream.
 
 ## Near term: retention
 

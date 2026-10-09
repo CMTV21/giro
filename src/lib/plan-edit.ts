@@ -79,3 +79,23 @@ export const dismissIdea = (trip: Trip, id: string): Trip => ({ ...trip, parked:
 export function setStart(trip: Trip, dayIndex: number, activityId: string, hhmm: string | undefined): Trip {
   return { ...trip, days: trip.days.map((d) => (d.index === dayIndex ? { ...d, activities: d.activities.map((a) => (a.id === activityId ? { ...a, start: hhmm } : a)) } : d)) };
 }
+
+const SLOT_ORDER: Record<Slot, number> = { morning: 0, afternoon: 1, evening: 2 };
+
+/**
+ * Add a ready-made stop (e.g. a restaurant from the food guide) to a day, keeping its slot: a
+ * lunch goes before the afternoon's sights, a dinner before the evening's, breakfast first.
+ */
+export function addActivity(trip: Trip, dayIndex: number, activity: Activity): Trip {
+  const day = trip.days[dayIndex];
+  if (!day) return trip;
+  const list = day.activities;
+  const want = SLOT_ORDER[activity.slot];
+  let at = list.findIndex((x) => x.category !== "transit" && SLOT_ORDER[x.slot] >= want);
+  if (at < 0) at = list.length;
+  // Arrival stays first and departure stays last.
+  if (at === 0 && list[0]?.category === "transit" && list.length > 1) at = 1;
+  if (at === list.length && list.at(-1)?.category === "transit" && list.length > 1) at = list.length - 1;
+  const next = [...list.slice(0, at), activity, ...list.slice(at)];
+  return { ...trip, days: trip.days.map((d) => (d.index === dayIndex ? { ...d, activities: next } : d)) };
+}

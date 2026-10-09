@@ -18,6 +18,7 @@ import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
 import { BookingsPanel } from "./BookingsPanel";
 import { DayMapToggle } from "./DayMap";
+import { FoodPanel } from "./FoodPanel";
 import { ItineraryBoard } from "./ItineraryBoard";
 import { PlaceFacts } from "./PlaceFacts";
 import { Avatar, GroupPanel } from "./GroupPanel";
@@ -26,6 +27,7 @@ import { PackingPanel } from "./PackingPanel";
 
 const TABS = [
   { id: "itinerary", label: "Itinerary" },
+  { id: "food", label: "Eat & drink" },
   { id: "live", label: "Today" },
   { id: "book", label: "Book" },
   { id: "budget", label: "Budget" },
@@ -321,6 +323,7 @@ export function TripView() {
             />
           </div>
         )}
+        {tab === "food" && <FoodPanel trip={trip} readOnly={readOnly} onChange={commit} onMessage={flash} />}
         {tab === "live" && <LivePanel trip={trip} readOnly={readOnly} onChange={commit} />}
         {tab === "book" && <BookPanel trip={trip} />}
         {tab === "budget" && <BudgetPanel trip={trip} />}
