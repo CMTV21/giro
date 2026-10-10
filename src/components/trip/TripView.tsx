@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fitToFlights } from "@/lib/schedule";
 import { curateTrip, recalcBudget } from "@/lib/curate";
 import { formatRange } from "@/lib/dates";
-import { downloadFile, encodeTrip, tripToICS, tripToText } from "@/lib/export";
+import { encodeTrip, tripToText } from "@/lib/export";
 import { money, tripFx } from "@/lib/money";
 import { planTrip } from "@/lib/plan-client";
 import { api, ApiError, deleteTrip, fetchTrip, saveTrip, updateTrip, type TripBundle } from "@/lib/storage";
@@ -15,6 +15,7 @@ import { loadTaste } from "@/lib/taste-client";
 import type { Trip } from "@/lib/types";
 import { BUDGET_META, PACE_META } from "../meta";
 import { useSession } from "../SessionProvider";
+import { CalendarDialog } from "./CalendarDialog";
 import { ChangeDates } from "./ChangeDates";
 import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
@@ -78,6 +79,7 @@ export function TripView() {
   const [denied, setDenied] = useState(false);
   const [tab, setTab] = useState<Tab>(isTab(search.get("tab")) ? (search.get("tab") as Tab) : "itinerary");
   const [copied, setCopied] = useState<"text" | "link">();
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [changingDates, setChangingDates] = useState(false);
@@ -268,7 +270,7 @@ export function TripView() {
             <span className="font-semibold text-white">{money(trip, trip.budget.total, true)} total</span>
           </div>
           <div className="no-print mt-8 flex flex-wrap gap-2">
-            <HeroBtn onClick={() => downloadFile(`${slug(trip.title)}.ics`, tripToICS(trip), "text/calendar")}><CalendarDays className="h-4 w-4" /> Add to calendar</HeroBtn>
+            <HeroBtn onClick={() => setCalendarOpen(true)}><CalendarDays className="h-4 w-4" /> Add to calendar</HeroBtn>
             <HeroBtn onClick={() => copy("link")}>{copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />} {copied === "link" ? "Link copied" : "Share copy"}</HeroBtn>
             <HeroBtn onClick={() => copy("text")}>{copied === "text" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied === "text" ? "Copied" : "Copy as text"}</HeroBtn>
             <Link href={`/trip/${trip.id}/guide`} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Printer className="h-4 w-4" /> Printable guide</Link>
@@ -352,6 +354,7 @@ export function TripView() {
         {tab === "group" && <GroupPanel bundle={bundle} onChanged={load} onSaveToAccount={moveToAccount} onLeft={() => router.push("/trips")} />}
         {tab === "packing" && <PackingPanel trip={trip} onChange={commit} readOnly={readOnly} shared={shared} />}
       </div>
+      {calendarOpen && <CalendarDialog bundle={bundle} canEdit={!readOnly} signedIn={Boolean(user)} onClose={() => setCalendarOpen(false)} />}
       {changingDates && (
         <ChangeDates
           trip={trip}
@@ -381,4 +384,3 @@ function HeroBtn({ children, onClick, disabled }: { children: React.ReactNode; o
   );
 }
 
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "giro-trip";

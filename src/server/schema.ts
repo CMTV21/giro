@@ -127,4 +127,16 @@ export const MIGRATIONS: string[][] = [
     // (not geocoded addresses) under the new rules.
     `delete from place_info where key not like 'addr:%'`,
   ],
+  [
+    // Secret per-trip links: a calendar feed URL and an email address for forwarding bookings.
+    // Lowercase hex so they survive email systems that lowercase addresses.
+    `create table trip_links (
+      trip_id text not null references trips(id) on delete cascade,
+      purpose text not null check (purpose in ('calendar', 'inbox')),
+      token text not null unique,
+      created_by text not null references users(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      primary key (trip_id, purpose)
+    )`,
+  ],
 ];

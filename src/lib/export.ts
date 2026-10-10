@@ -11,8 +11,10 @@ const stamp = (iso: string, hour: number, minute = 0) =>
   `${iso.replaceAll("-", "")}T${String(hour).padStart(2, "0")}${String(minute).padStart(2, "0")}00`;
 
 /** Calendar file with one event per activity (floating local time) and all-day events for each stay. */
-export function tripToICS(trip: Trip): string {
+export function tripToICS(trip: Trip, { feed = false } = {}): string {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Giro//Trip Planner//EN", "CALSCALE:GREGORIAN", `X-WR-CALNAME:${icsEscape(trip.title)}`];
+  // Subscribed calendars: ask apps to re-check every few hours (Google decides its own pace).
+  if (feed) lines.push("REFRESH-INTERVAL;VALUE=DURATION:PT3H", "X-PUBLISHED-TTL:PT3H", "METHOD:PUBLISH");
   const now = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
 
   for (const stay of trip.stays) {

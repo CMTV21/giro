@@ -70,7 +70,7 @@ export async function roleFor(db: Db, tripId: string, userId: string): Promise<R
   return row?.role;
 }
 
-async function requireRole(db: Db, tripId: string, userId: string, min: Role): Promise<Role> {
+export async function requireRole(db: Db, tripId: string, userId: string, min: Role): Promise<Role> {
   const role = await roleFor(db, tripId, userId);
   if (!role) {
     const [exists] = await db.query("select 1 from trips where id = $1", [tripId]);
