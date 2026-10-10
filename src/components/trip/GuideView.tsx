@@ -10,6 +10,7 @@ import { clock, dayWindow, scheduleDay, type ScheduledItem } from "@/lib/schedul
 import { fetchTrip } from "@/lib/storage";
 import { mapStops, resolveStops, stayFor, stayPoint, type MapStop, type ResolvedStop } from "@/lib/stops-client";
 import type { Day, Trip } from "@/lib/types";
+import { HeadsUpCard, headsUpFor } from "./HeadsUp";
 import { LeafletMap } from "./DayMap";
 import { PlaceStory } from "./PlaceFacts";
 
@@ -153,6 +154,12 @@ function GuideDaySection({ g, trip, firstInCity }: { g: GuideDay; trip: Trip; fi
           );
         })}
       </ol>
+
+      {firstInCity && headsUpFor([g.day.city]).length > 0 && (
+        <div className="mt-6 rounded-2xl border border-amber-200 p-4">
+          <HeadsUpCard cities={[g.day.city]} compact />
+        </div>
+      )}
 
       {dishes.length > 0 && (
         <div className="mt-6 break-inside-avoid rounded-2xl bg-sand/60 p-4">

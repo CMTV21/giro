@@ -20,6 +20,9 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **History & facts** for each stop (Wikipedia, attributed), **day maps**, and a **printable sightseeing guide** |
 | | **Receipts** on shared expenses, read by Claude to fill in the amount and currency |
 | | **Photos** of stops, ideas and dishes (freely licensed Wikimedia Commons images, photographer credited) and **Tripadvisor reviews** links |
+| | **Your way**: children's ages (fares and picks fit them), access needs (less walking, step-free, stroller), edit any stop's time, length, cost and notes, change dates or length in place, start from scratch, "never suggest this again" |
+| | **Notes & packing**: trip notepad and stop notes shared with the group, your own packing items, and a heads-up on scams, pickpockets and local rules per city |
+| | **Community picks**: "Loved by N travellers" once at least 3 travellers book, pick or vote for a stop |
 | | **Eat & drink**: must-try dishes and hand-picked restaurants for all 26 catalog cities (Giro AI writes one for other cities), with live Tripadvisor rankings and one-tap "add to a day" at the right meal |
 
 ## Quick start
@@ -27,7 +30,7 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 ```bash
 npm install
 npm run dev        # http://localhost:3000. Data is stored in an embedded Postgres under .data/
-npm test           # 60 tests: engine, currency, catalog, auth, groups, split, clicks, live, discover
+npm test           # ~100 tests: engine, currency, catalog, auth, groups, split, clicks, live, discover, editing, access, community
 npm run typecheck
 npm run build && npm start
 ```

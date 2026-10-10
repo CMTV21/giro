@@ -4,6 +4,7 @@ import { Backpack, Check, Lightbulb, NotebookPen, Plus, RotateCcw, X } from "luc
 import { useEffect, useRef, useState } from "react";
 import { addPackingItem, packingItems, removePackingItem, restoreSuggestions } from "@/lib/packing";
 import type { Trip } from "@/lib/types";
+import { HeadsUpCard } from "./HeadsUp";
 
 // Packing is personal, even on a shared trip, so ticks live with each traveller rather than in the trip.
 const key = (tripId: string) => `giro.packed.${tripId}`;
@@ -95,6 +96,7 @@ export function PackingPanel({ trip, onChange, readOnly, shared }: { trip: Trip;
           )}
         </p>
       </section>
+      <HeadsUpCard cities={trip.days.map((d) => d.city)} />
       <section className="card p-5 sm:p-6">
         <h3 className="mb-4 flex items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4" /> Good to know</h3>
         <ul className="space-y-3">
