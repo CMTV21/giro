@@ -43,7 +43,7 @@ export function tripToICS(trip: Trip): string {
         `DTSTART:${stamp(startDay, Math.floor((it.start % 1440) / 60), it.start % 60)}`,
         `DTEND:${stamp(endDay, Math.floor((endMin % 1440) / 60), endMin % 60)}`,
         `SUMMARY:${icsEscape(it.kind === "flight" ? `✈ ${it.label}` : it.label)}`,
-        ...(a ? [`DESCRIPTION:${icsEscape([a.description, a.tip ? `Tip: ${a.tip}` : ""].filter(Boolean).join("\n"))}`] : []),
+        ...(a ? [`DESCRIPTION:${icsEscape([a.description, a.note ? `Note: ${a.note}` : "", a.tip ? `Tip: ${a.tip}` : ""].filter(Boolean).join("\n"))}`] : []),
         ...(a?.area ? [`LOCATION:${icsEscape(`${a.area}, ${day.city}`)}`] : []),
         "END:VEVENT",
       );

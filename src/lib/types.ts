@@ -164,6 +164,12 @@ export interface Trip {
   palette: [string, string];
   /** Packing-list items the traveller has ticked off. */
   packed?: string[];
+  /** Items travellers added to the packing list (shared with the group). */
+  packingAdded?: string[];
+  /** Suggested items someone took off the list. */
+  packingRemoved?: string[];
+  /** The trip's notepad: documents, reminders, ideas. Shared with the group. */
+  notes?: string;
   flights?: Flight[];
   parked?: ParkedIdea[];
   /** Giro AI's dishes and restaurants for cities outside the curated catalog. */

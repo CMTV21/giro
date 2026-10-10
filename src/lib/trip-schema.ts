@@ -110,6 +110,9 @@ export const TripSchema = z.object({
   source: z.enum(["giro", "ai"]),
   palette: z.tuple([hex, hex]),
   packed: z.array(str(200)).max(60).optional(),
+  packingAdded: z.array(str(120)).max(60).optional(),
+  packingRemoved: z.array(str(200)).max(60).optional(),
+  notes: str(5000).optional(),
   flights: z.array(FlightSchema).max(12).optional(),
   parked: z.array(ActivitySchema.extend({ city: str(80), reason: str(200).optional() })).max(100).optional(),
   food: z

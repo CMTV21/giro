@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BedDouble, Lightbulb, Plane, Printer, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, BedDouble, Lightbulb, Plane, Printer, StickyNote, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -68,6 +68,12 @@ export function GuideView() {
         <p className="eyebrow">Sightseeing guide</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">{trip.title}</h1>
         <p className="mt-1 text-ink-soft">{formatRange(trip.request.startDate, trip.request.endDate)}</p>
+        {trip.notes && !only && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm whitespace-pre-line text-amber-950">
+            <p className="mb-1 text-xs font-semibold tracking-wide text-amber-800 uppercase">Trip notes</p>
+            {trip.notes}
+          </div>
+        )}
       </header>
 
       {!days ? (
@@ -135,7 +141,8 @@ function GuideDaySection({ g, trip, firstInCity }: { g: GuideDay; trip: Trip; fi
                 {clock(s.item.start)} – {clock(s.item.end)}{a.area ? ` · ${a.area}` : ""}
               </p>
               <h3 className="mt-1.5 text-lg font-semibold">{a.title}</h3>
-              <p className="mt-1 text-ink-soft">{a.description}</p>
+              {a.description && a.description !== "Added by you." && <p className="mt-1 text-ink-soft">{a.description}</p>}
+              {a.note && <p className="mt-2 flex gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm whitespace-pre-line text-amber-950"><StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />{a.note}</p>}
               {a.tip && <p className="mt-2 flex gap-2 text-sm text-ink-soft"><Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand" />{a.tip}</p>}
               {s.info.extract && (
                 <div className="mt-3 border-t border-line pt-3 text-sm">

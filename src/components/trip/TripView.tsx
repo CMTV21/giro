@@ -32,7 +32,7 @@ const TABS = [
   { id: "book", label: "Book" },
   { id: "budget", label: "Budget" },
   { id: "group", label: "Group" },
-  { id: "packing", label: "Packing & tips" },
+  { id: "packing", label: "Notes & packing" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const isTab = (v: string | null): v is Tab => TABS.some((t) => t.id === v);
@@ -333,7 +333,7 @@ export function TripView() {
         {tab === "book" && <BookPanel trip={trip} />}
         {tab === "budget" && <BudgetPanel trip={trip} />}
         {tab === "group" && <GroupPanel bundle={bundle} onChanged={load} onSaveToAccount={moveToAccount} onLeft={() => router.push("/trips")} />}
-        {tab === "packing" && <PackingPanel trip={trip} onChange={commit} />}
+        {tab === "packing" && <PackingPanel trip={trip} onChange={commit} readOnly={readOnly} shared={shared} />}
       </div>
       {toast && (
         <div role="status" className="no-print fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lift sm:bottom-6">
