@@ -24,6 +24,7 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Notes & packing**: trip notepad and stop notes shared with the group, your own packing items, and a heads-up on scams, pickpockets and local rules per city |
 | | **Community picks**: "Loved by N travellers" once at least 3 travellers book, pick or vote for a stop |
 | | **Eat & drink**: must-try dishes and hand-picked restaurants for all 26 catalog cities (Giro AI writes one for other cities), with live Tripadvisor rankings and one-tap "add to a day" at the right meal |
+| | **Trip guides** (`/guides`): public, indexable 3-, 5- and 7-day itineraries for every catalog city (a length is published only when every day is full), with where to stay, what to eat, a daily budget and "Make this trip mine" |
 
 ## Quick start
 

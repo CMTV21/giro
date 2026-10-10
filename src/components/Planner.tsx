@@ -95,7 +95,9 @@ export function Planner() {
     setReq((r) => {
       if (r.startDate && r.endDate) return r;
       const start = r.startDate || addDays(toISODate(new Date()), 30);
-      return { ...r, startDate: start, endDate: r.endDate || addDays(start, 5) };
+      // Guides link here with a length ("nights") rather than dates.
+      const nights = Math.min(29, Math.max(1, Number(params.get("nights")) || 5));
+      return { ...r, startDate: start, endDate: r.endDate || addDays(start, nights) };
     });
     // Start from the traveller's learned favourites when the link doesn't specify interests.
     const learned = topInterests(loadTaste(), 3);

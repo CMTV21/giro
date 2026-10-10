@@ -174,3 +174,10 @@ test("share links drop booking references", async () => {
   assert.equal(back.stays[0].booking!.url, undefined);
   assert.equal(back.stays[0].booking!.name, "Hotel");
 });
+
+test("a day trip beats a day of free time once the city's short sights run out", () => {
+  const trip = curateTrip({ ...base, destinations: ["Reykjavik"], startDate: "2027-06-08", endDate: "2027-06-12", interests: ["culture", "food"], origin: "" });
+  const middle = trip.days.slice(1, -1);
+  assert.ok(middle.every((d) => d.activities.some((a) => a.category !== "transit" && a.category !== "free")));
+  assert.ok(middle.some((d) => d.activities.some((a) => a.durationHrs >= 6)));
+});

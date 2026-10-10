@@ -15,6 +15,7 @@ export function SiteFooter() {
           <p className="font-semibold">Plan</p>
           <Link className="block text-muted hover:text-ink" href="/plan">Trip planner</Link>
           <Link className="block text-muted hover:text-ink" href="/explore">Explore destinations</Link>
+          <Link className="block text-muted hover:text-ink" href="/guides">Trip guides</Link>
           <Link className="block text-muted hover:text-ink" href="/trips">My trips</Link>
         </div>
         <div className="space-y-2 text-sm">

@@ -2,10 +2,12 @@ import Link from "next/link";
 import { AccountNav } from "./AccountNav";
 import { Logo } from "./Logo";
 
+// Phones show the essentials; the rest appear from the small breakpoint up.
 const NAV = [
-  { href: "/discover", label: "Discover" },
-  { href: "/explore", label: "Explore" },
-  { href: "/trips", label: "My trips" },
+  { href: "/discover", label: "Discover", phone: true },
+  { href: "/guides", label: "Guides", phone: false },
+  { href: "/explore", label: "Explore", phone: false },
+  { href: "/trips", label: "My trips", phone: true },
 ];
 
 export function SiteHeader() {
@@ -16,8 +18,8 @@ export function SiteHeader() {
           <Logo />
         </Link>
         <nav className="flex items-center gap-0.5 sm:gap-1">
-          {NAV.map((item, i) => (
-            <Link key={item.href} href={item.href} className={`rounded-full px-2.5 py-2 text-sm font-medium text-ink-soft transition hover:bg-sand hover:text-ink sm:px-3 ${i === 1 ? "hidden sm:block" : ""}`}>
+          {NAV.map((item) => (
+            <Link key={item.href} href={item.href} className={`rounded-full px-2.5 py-2 text-sm font-medium text-ink-soft transition hover:bg-sand hover:text-ink sm:px-3 ${item.phone ? "" : "hidden sm:block"}`}>
               {item.label}
             </Link>
           ))}

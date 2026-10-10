@@ -283,11 +283,15 @@ function planDay(state: CityState, slots: Slot[], ctx: ScoreContext, allowDayTri
     anchorArea ??= act.area;
   };
 
-  // A full-day excursion replaces the morning and afternoon.
-  if (allowDayTrip && remaining.includes("morning") && remaining.includes("afternoon")) {
+  // A full-day excursion replaces the morning and afternoon. When the city's shorter sights can't
+  // fill the daytime any more, the best excursion beats a day of free time, whatever the interests.
+  const daytime = remaining.filter((s) => s !== "evening");
+  const regularsLeft = candidates.filter((c) => c.act.hrs < 6 && daytime.some((s) => fitsSlot(c.act, s))).length;
+  const starved = regularsLeft < daytime.length;
+  if ((allowDayTrip || starved) && remaining.includes("morning") && remaining.includes("afternoon")) {
     const best = candidates.filter((c) => c.act.hrs >= 6).sort((x, y) => y.base - x.base)[0];
     const bestRegular = candidates.filter((c) => c.act.hrs < 6).sort((x, y) => y.base - x.base)[0];
-    if (best && best.base >= (bestRegular?.base ?? 0) - 0.5 && best.base > 3) {
+    if (best && (starved || (best.base >= (bestRegular?.base ?? 0) - 0.5 && best.base > 3))) {
       take(best.act, "morning");
       state.dayTrips++;
       for (const s of ["morning", "afternoon"] as Slot[]) {
