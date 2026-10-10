@@ -255,7 +255,7 @@ const transit = (title: string, description: string, slot: Slot): Activity => ({
   estCost: 0,
 });
 
-const freeTime = (city: string, slot: Slot, area?: string): Activity => ({
+export const freeTime = (city: string, slot: Slot, area?: string): Activity => ({
   id: newId(),
   title: slot === "evening" ? "Evening at leisure" : area ? `Free time around ${area}` : `Wander ${city}`,
   description: slot === "evening" ? "Dinner somewhere that catches your eye, then a stroll or an early night." : "Unscheduled time for cafés, rest, or the discovery you didn't plan.",

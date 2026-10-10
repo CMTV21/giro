@@ -192,8 +192,8 @@ export function fitToFlights(trip: Trip): { trip: Trip; moved: ParkedIdea[]; war
   const ret = flights.find((f) => f.kind === "return");
   const first = trip.days[0]?.date;
   const last = trip.days.at(-1)?.date;
-  if (outbound && first && outbound.arriveDate > (trip.days[1]?.date ?? first)) warnings.push(`Your outbound flight lands on ${outbound.arriveDate}, more than a day after the trip starts. Use Edit details to change the trip dates.`);
-  if (ret && last && ret.departDate !== last) warnings.push(`Your return flight leaves on ${ret.departDate}, but the itinerary ends on ${last}. Use Edit details to match the dates.`);
+  if (outbound && first && outbound.arriveDate > (trip.days[1]?.date ?? first)) warnings.push(`Your outbound flight lands on ${outbound.arriveDate}, more than a day after the trip starts. Use Change dates to move the trip.`);
+  if (ret && last && ret.departDate !== last) warnings.push(`Your return flight leaves on ${ret.departDate}, but the itinerary ends on ${last}. Use Change dates to match them.`);
 
   let days = trip.days.map((d) => ({ ...d, activities: [...d.activities] }));
 

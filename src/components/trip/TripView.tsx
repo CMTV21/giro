@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Check, Copy, Link2, Pencil, Printer, RefreshCw, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { CalendarDays, CalendarRange, Check, Copy, Link2, Pencil, Printer, RefreshCw, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,6 +14,7 @@ import { loadTaste } from "@/lib/taste-client";
 import type { Trip } from "@/lib/types";
 import { BUDGET_META, PACE_META } from "../meta";
 import { useSession } from "../SessionProvider";
+import { ChangeDates } from "./ChangeDates";
 import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
 import { BookingsPanel } from "./BookingsPanel";
@@ -78,6 +79,7 @@ export function TripView() {
   const [copied, setCopied] = useState<"text" | "link">();
   const [regenerating, setRegenerating] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [changingDates, setChangingDates] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const [toast, setToast] = useState<string>();
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -258,7 +260,8 @@ export function TripView() {
             <HeroBtn onClick={() => copy("text")}>{copied === "text" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied === "text" ? "Copied" : "Copy as text"}</HeroBtn>
             <Link href={`/trip/${trip.id}/guide`} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Printer className="h-4 w-4" /> Printable guide</Link>
             {!readOnly && <HeroBtn onClick={regenerate} disabled={regenerating}><RefreshCw className={`h-4 w-4 ${regenerating ? "animate-spin" : ""}`} /> {regenerating ? "Re-curating…" : "Regenerate"}</HeroBtn>}
-            <Link href={editUrl(trip)} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Pencil className="h-4 w-4" /> {readOnly ? "Plan my own version" : "Edit details"}</Link>
+            {!readOnly && <HeroBtn onClick={() => setChangingDates(true)}><CalendarRange className="h-4 w-4" /> Change dates</HeroBtn>}
+            <Link href={editUrl(trip)} title={readOnly ? undefined : "Re-plan from scratch with new details"} className="btn border border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20"><Pencil className="h-4 w-4" /> {readOnly ? "Plan my own version" : "Re-plan"}</Link>
             {bundle.role === "owner" && (
               <HeroBtn
                 onClick={async () => {
@@ -335,6 +338,17 @@ export function TripView() {
         {tab === "group" && <GroupPanel bundle={bundle} onChanged={load} onSaveToAccount={moveToAccount} onLeft={() => router.push("/trips")} />}
         {tab === "packing" && <PackingPanel trip={trip} onChange={commit} readOnly={readOnly} shared={shared} />}
       </div>
+      {changingDates && (
+        <ChangeDates
+          trip={trip}
+          onClose={() => setChangingDates(false)}
+          onApply={(next, message) => {
+            commit(next);
+            setChangingDates(false);
+            flash(message);
+          }}
+        />
+      )}
       {toast && (
         <div role="status" className="no-print fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lift sm:bottom-6">
           <span className="flex-1">{toast}</span>
