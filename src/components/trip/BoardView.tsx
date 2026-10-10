@@ -4,7 +4,9 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ArchiveRestore, Ban, CircleCheck, Lightbulb, MapPin, Pencil, Pin, Plus, Star, Ticket, X } from "lucide-react";
 import { useState } from "react";
 import { BOARD_FROM, BOARD_TO, lengthLabel, placeAtTime, setDuration, slotForTime, snap, type BoardSource } from "@/lib/board";
-import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
+import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref, type BookingLink } from "@/lib/booking";
+import { formatLocal } from "@/lib/currency";
+import { useTour } from "@/lib/tours-client";
 import { newId } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
 import { ideasFor, type Idea } from "@/lib/ideas";
@@ -350,9 +352,7 @@ function StopPanel({ trip, selection, onClose, onEditing, onChange, onPlace, hou
       {a.note && <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-950">{a.note}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {ticket && !a.booked && (
-          <a href={trackedHref({ ...ticket, valueUSD: a.estCost }, trip.id)} target="_blank" rel="noopener noreferrer sponsored" className="btn-primary px-3.5 py-2 text-xs"><Ticket className="h-3.5 w-3.5" /> Book tickets</a>
-        )}
+        {a.bookable && !a.booked && <BookTickets a={a} city={day.city} trip={trip} fallback={ticket} />}
         {a.bookable && (
           <button type="button" className="btn-ghost px-3.5 py-2 text-xs" onClick={() => {
             if (!a.booked) recordSignal("booked", a.category);
@@ -386,6 +386,33 @@ function StopPanel({ trip, selection, onClose, onEditing, onChange, onPlace, hou
             }}><Ban className="h-3.5 w-3.5" /> Never suggest</button>
           )}
         </div>
+      )}
+    </>
+  );
+}
+
+/** "Book tickets": a matched tour with its rating and price when the partner API has one, else a search. */
+function BookTickets({ a, city, trip, fallback }: { a: Activity; city: string; trip: Trip; fallback?: BookingLink }) {
+  const fx = tripFx(trip);
+  const offer = useTour(a.title, city, fx.currency, true);
+  const href = offer
+    ? trackedHref({ url: offer.url, provider: offer.provider, kind: "experiences", valueUSD: offer.fromPrice ? offer.fromPrice / (fx.rate || 1) : a.estCost }, trip.id)
+    : fallback
+      ? trackedHref({ ...fallback, valueUSD: a.estCost }, trip.id)
+      : undefined;
+  if (!href) return null;
+  return (
+    <>
+      <a href={href} target="_blank" rel="noopener noreferrer sponsored" className="btn-primary px-3.5 py-2 text-xs">
+        <Ticket className="h-3.5 w-3.5" /> {offer ? `Book on ${offer.provider}${offer.fromPrice ? ` · from ${formatLocal(offer.fromPrice, fx.currency)}` : ""}` : "Book tickets"}
+      </a>
+      {offer?.rating && (
+        <p className="basis-full text-xs text-ink-soft">
+          <Star className="mr-1 inline h-3 w-3 fill-amber-400 text-amber-400" />
+          {offer.rating.toFixed(1)}
+          {offer.reviews ? ` (${offer.reviews.toLocaleString("en-CA")} reviews)` : ""}
+          {offer.freeCancellation ? " · Free cancellation" : ""}
+        </p>
       )}
     </>
   );

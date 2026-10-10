@@ -4,8 +4,9 @@ import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, Footprints, Grip
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
-import { formatMoney } from "@/lib/currency";
+import { formatLocal, formatMoney } from "@/lib/currency";
 import { clock, fromMinutes } from "@/lib/schedule";
+import { useTour } from "@/lib/tours-client";
 import type { VoteTally } from "@/lib/storage";
 import type { Activity } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
@@ -73,7 +74,12 @@ export function ActivityCard({
   const isTransit = a.category === "transit";
   const isFree = a.category === "free";
   const ticket = a.bookable ? experienceLinks(city, a.title, fx.currency)[0] : undefined;
-  const ticketUrl = ticket ? trackedHref({ ...ticket, valueUSD: a.estCost }, tripId) : undefined;
+  const offer = useTour(a.title, city, fx.currency, Boolean(a.bookable) && !a.booked && !isTransit && !isFree);
+  const ticketUrl = offer
+    ? trackedHref({ url: offer.url, provider: offer.provider, kind: "experiences", valueUSD: offer.fromPrice ? offer.fromPrice / (fx.rate || 1) : a.estCost }, tripId)
+    : ticket
+      ? trackedHref({ ...ticket, valueUSD: a.estCost }, tripId)
+      : undefined;
   const reviewsUrl = !isTransit && !isFree ? trackedHref(reviewsLink(a.title, city, fx.currency), tripId) : undefined;
   // Restaurants added from the food guide share names with people and other places; match strictly.
   const restaurant = a.ref?.startsWith("food:");
@@ -167,6 +173,12 @@ export function ActivityCard({
           </p>
         )}
         {extra}
+        {offer && (offer.rating || offer.freeCancellation) && (
+          <p className="no-print mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft" title={offer.title}>
+            {offer.rating && <span className="inline-flex items-center gap-1 font-semibold text-ink"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {offer.rating.toFixed(1)}{offer.reviews ? <span className="font-normal text-muted">({offer.reviews.toLocaleString("en-CA")} reviews on {offer.provider})</span> : null}</span>}
+            {offer.freeCancellation && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Free cancellation</span>}
+          </p>
+        )}
         <div className="no-print mt-3 flex flex-wrap items-center gap-1.5">
           {a.area && !isTransit && (
             <a href={mapsSearchUrl(`${isFree ? a.area : a.title}, ${city}`)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-sand">
@@ -175,7 +187,7 @@ export function ActivityCard({
           )}
           {ticketUrl && (
             <a href={ticketUrl} target="_blank" rel="noopener noreferrer sponsored" className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand-dark hover:bg-brand/15">
-              <Ticket className="h-3.5 w-3.5" /> Get tickets <ExternalLink className="h-3 w-3" />
+              <Ticket className="h-3.5 w-3.5" /> {offer ? `Book on ${offer.provider}${offer.fromPrice ? ` · from ${formatLocal(offer.fromPrice, fx.currency)}` : ""}` : "Get tickets"} <ExternalLink className="h-3 w-3" />
             </a>
           )}
           {reviewsUrl && (

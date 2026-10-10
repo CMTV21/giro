@@ -169,4 +169,12 @@ export const MIGRATIONS: string[][] = [
       fetched_at timestamptz not null default now()
     )`,
   ],
+  [
+    // A matching bookable tour per stop and currency, refreshed weekly (prices move).
+    `create table tour_cache (
+      key text primary key,
+      data jsonb,
+      fetched_at timestamptz not null default now()
+    )`,
+  ],
 ];
