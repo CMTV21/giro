@@ -22,6 +22,7 @@ import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
 import { BookingsPanel } from "./BookingsPanel";
 import { DayMapToggle } from "./DayMap";
+import { EventsCard } from "./EventsCard";
 import { FoodPanel } from "./FoodPanel";
 import { ItineraryBoard } from "./ItineraryBoard";
 import { PlaceFacts } from "./PlaceFacts";
@@ -328,6 +329,7 @@ export function TripView() {
         {tab === "itinerary" && (
           <div className="space-y-8">
             <AdvisoryNotice trip={trip} readOnly={readOnly} onSeen={(seen) => latest.current && commit({ ...latest.current.trip, advisorySeen: seen })} />
+            <EventsCard trip={trip} readOnly={readOnly} onChange={(t) => commit(recalcBudget(t))} onMessage={flash} />
             <BookingsPanel
               trip={trip}
               readOnly={readOnly}

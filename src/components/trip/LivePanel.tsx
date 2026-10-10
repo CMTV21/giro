@@ -1,5 +1,6 @@
 "use client";
 
+import { FlightStatusCard } from "./FlightStatusCard";
 import { CloudRain, Clock, CloudSun, Navigation, Shuffle, Sun, Ticket, Timer, Umbrella } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { experienceLinks, trackedHref } from "@/lib/booking";
@@ -65,6 +66,7 @@ export function LivePanel({ trip, readOnly, onChange }: { trip: Trip; readOnly: 
 
   return (
     <div className="space-y-6">
+      {todayISO && <FlightStatusCard trip={trip} todayISO={todayISO} readOnly={readOnly} onChange={onChange} />}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">{live ? "Live · today" : "Preview a day"}</p>

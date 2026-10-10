@@ -1,8 +1,8 @@
 "use client";
 
-import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, Footprints, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
+import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, Footprints, TrainFront, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
-import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
+import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref, transferLink } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
 import { formatLocal, formatMoney } from "@/lib/currency";
 import { clock, fromMinutes } from "@/lib/schedule";
@@ -74,6 +74,9 @@ export function ActivityCard({
   const isTransit = a.category === "transit";
   const isFree = a.category === "free";
   const ticket = a.bookable ? experienceLinks(city, a.title, fx.currency)[0] : undefined;
+  // Transfer days ("Lisbon → Porto"): compare trains and buses.
+  const hop = isTransit ? /^(.+?) → (.+)$/.exec(a.title) : null;
+  const transfer = hop ? transferLink(hop[1], hop[2]) : undefined;
   const offer = useTour(a.title, city, fx.currency, Boolean(a.bookable) && !a.booked && !isTransit && !isFree);
   const ticketUrl = offer
     ? trackedHref({ url: offer.url, provider: offer.provider, kind: "experiences", valueUSD: offer.fromPrice ? offer.fromPrice / (fx.rate || 1) : a.estCost }, tripId)
@@ -183,6 +186,11 @@ export function ActivityCard({
           {a.area && !isTransit && (
             <a href={mapsSearchUrl(`${isFree ? a.area : a.title}, ${city}`)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-sand">
               <MapPin className="h-3.5 w-3.5" /> {a.area}
+            </a>
+          )}
+          {transfer && (
+            <a href={trackedHref(transfer, tripId)} target="_blank" rel="noopener noreferrer sponsored" className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-900 hover:bg-sky-100">
+              <TrainFront className="h-3.5 w-3.5" /> Trains and buses <ExternalLink className="h-3 w-3" />
             </a>
           )}
           {ticketUrl && (

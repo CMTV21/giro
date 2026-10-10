@@ -185,4 +185,12 @@ export const MIGRATIONS: string[][] = [
       fetched_at timestamptz not null default now()
     )`,
   ],
+  [
+    // Short-lived provider answers (events on a city's dates, flight status).
+    `create table api_cache (
+      key text primary key,
+      data jsonb,
+      fetched_at timestamptz not null default now()
+    )`,
+  ],
 ];

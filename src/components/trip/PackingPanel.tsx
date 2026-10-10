@@ -1,7 +1,9 @@
 "use client";
 
-import { Backpack, Check, Lightbulb, NotebookPen, Plus, RotateCcw, X } from "lucide-react";
+import { Backpack, Check, ExternalLink, Lightbulb, NotebookPen, Plus, RotateCcw, Smartphone, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { esimLink, trackedHref } from "@/lib/booking";
+import { findDestination } from "@/lib/destinations";
 import { addPackingItem, packingItems, removePackingItem, restoreSuggestions } from "@/lib/packing";
 import type { Trip } from "@/lib/types";
 import { HeadsUpCard } from "./HeadsUp";
@@ -97,6 +99,7 @@ export function PackingPanel({ trip, onChange, readOnly, shared }: { trip: Trip;
         </p>
       </section>
       <HeadsUpCard cities={trip.days.map((d) => d.city)} />
+      <StayConnected trip={trip} />
       <section className="card p-5 sm:p-6">
         <h3 className="mb-4 flex items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4" /> Good to know</h3>
         <ul className="space-y-3">
@@ -169,6 +172,24 @@ function TripNotes({ trip, onChange, readOnly, shared }: { trip: Trip; onChange:
           <p className="mt-1.5 text-xs text-muted">{shared ? "Everyone on this trip can read and edit these notes." : "Saved with the trip and printed in your guide."} Notes on individual stops live on each stop (pencil icon).</p>
         </>
       )}
+    </section>
+  );
+}
+
+/** Travel eSIMs for each country on the trip, so maps and messages work from the airport. */
+function StayConnected({ trip }: { trip: Trip }) {
+  const countries = [...new Set(trip.days.map((d) => findDestination(d.city)?.country).filter((c): c is string => Boolean(c)))];
+  const links = countries.map(esimLink).filter((l): l is NonNullable<ReturnType<typeof esimLink>> => Boolean(l));
+  if (!links.length) return null;
+  return (
+    <section className="card p-5 sm:p-6" aria-labelledby="connected-title">
+      <h3 id="connected-title" className="flex items-center gap-2 font-semibold"><Smartphone className="h-4 w-4" /> Stay connected</h3>
+      <p className="mt-1 text-sm text-muted">Canadian plans can charge a lot to roam. A travel eSIM gives you data the moment you land; check your phone supports eSIM first.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {links.map((l) => (
+          <a key={l.url} href={trackedHref(l, trip.id)} target="_blank" rel="noopener noreferrer sponsored" className="btn-ghost px-3.5 py-2 text-xs">{l.label} <ExternalLink className="h-3 w-3" /></a>
+        ))}
+      </div>
     </section>
   );
 }

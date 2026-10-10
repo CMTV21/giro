@@ -2,7 +2,8 @@
 
 import { CalendarCheck, ExternalLink, MapPin, Plus, Sparkles, Star, Trophy, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
-import { mapsSearchUrl, reviewsLink, topRestaurantsLink, trackedHref } from "@/lib/booking";
+import { mapsSearchUrl, reserveLink, reviewsLink, topRestaurantsLink, trackedHref } from "@/lib/booking";
+import { findDestination } from "@/lib/destinations";
 import { recalcBudget, newId } from "@/lib/curate";
 import { formatMoney } from "@/lib/currency";
 import { formatDate } from "@/lib/dates";
@@ -106,7 +107,9 @@ export function FoodPanel({ trip, readOnly, onChange, onMessage }: { trip: Trip;
                       <p className="mt-0.5 text-xs text-muted">{r.kind} · {r.area} · Best for {r.meal}</p>
                       <p className="mt-2 text-sm leading-relaxed text-ink-soft">{r.why}</p>
                       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                        {r.book && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900"><CalendarCheck className="h-3 w-3" /> Reserve ahead</span>}
+                        {r.book && (
+                          <a href={trackedHref(reserveLink(r.name, city, findDestination(city)?.country), trip.id)} target="_blank" rel="noopener noreferrer" title="Popular: reserve ahead" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"><CalendarCheck className="h-3.5 w-3.5" /> Reserve ahead</a>
+                        )}
                         <a href={trackedHref(reviewsLink(r.name, city, fx.currency), trip.id)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-ink-soft hover:bg-sand"><Star className="h-3.5 w-3.5" /> Reviews</a>
                         <a href={mapsSearchUrl(`${r.name}, ${r.area}, ${city}`)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-ink-soft hover:bg-sand"><MapPin className="h-3.5 w-3.5" /> Map</a>
                         {inPlan !== undefined ? (

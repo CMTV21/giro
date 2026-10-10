@@ -11,7 +11,7 @@ import type { TripRequest } from "./types.ts";
  * attributed. To move to in-app booking, replace a provider's builder with its partner API.
  */
 
-export type ProviderKind = "flights" | "stays" | "cars" | "experiences" | "reviews";
+export type ProviderKind = "flights" | "stays" | "cars" | "experiences" | "reviews" | "transport" | "connectivity" | "dining" | "events";
 
 export interface BookingLink {
   provider: string;
@@ -363,4 +363,34 @@ export function trackedHref(link: Pick<BookingLink, "url" | "provider" | "kind" 
   if (tripId) p.set("t", tripId);
   if (link.valueUSD && link.valueUSD > 0) p.set("v", String(Math.round(link.valueUSD)));
   return `/go?${p.toString()}`;
+}
+
+const slugPart = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** Trains and buses between two cities (Omio's route pages). */
+export function transferLink(from: string, to: string): BookingLink | undefined {
+  const a = slugPart(from);
+  const b = slugPart(to);
+  if (!a || !b || a === b) return undefined;
+  return { provider: "Omio", kind: "transport", label: `Trains and buses ${from} to ${to}`, blurb: "Compare trains, buses and flights.", url: `https://www.omio.com/trains/${a}/${b}` };
+}
+
+/** Airalo's page slug where it differs from the country name. */
+const AIRALO_SLUG: Record<string, string> = { Türkiye: "turkey", Czechia: "czech-republic", "South Korea": "south-korea", "United Kingdom": "united-kingdom", "United States": "united-states" };
+
+/** A travel eSIM for a country, so data works on landing. */
+export function esimLink(country: string): BookingLink | undefined {
+  if (!country || country === "Canada") return undefined;
+  const slug = AIRALO_SLUG[country] ?? slugPart(country);
+  return { provider: "Airalo", kind: "connectivity", label: `eSIM for ${country}`, blurb: "Data from the moment you land.", url: `https://www.airalo.com/${slug}-esim` };
+}
+
+/** Countries where OpenTable takes most restaurant bookings; elsewhere Google Maps shows the venue's booking partner. */
+const OPENTABLE_COUNTRIES = new Set(["Canada", "United States", "United Kingdom", "Mexico", "Australia", "Ireland"]);
+
+export function reserveLink(name: string, city: string, country: string | undefined): BookingLink {
+  if (country && OPENTABLE_COUNTRIES.has(country)) {
+    return { provider: "OpenTable", kind: "dining", label: `Reserve ${name}`, blurb: "Book a table.", url: withParams("https://www.opentable.com/s", { term: `${name} ${city}` }) };
+  }
+  return { provider: "Google Maps", kind: "dining", label: `Reserve ${name}`, blurb: "Opens the restaurant on Google Maps, where its booking partner appears.", url: mapsSearchUrl(`${name}, ${city}`) };
 }
