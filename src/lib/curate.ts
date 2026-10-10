@@ -2,6 +2,7 @@ import { distanceKm, fareForDistance, findAirport } from "./airports.ts";
 import { DEFAULT_CURRENCY, fallbackFx, formatLocal, isCurrency, type FxSnapshot } from "./currency.ts";
 import { addDays, monthOf, nightsBetween } from "./dates.ts";
 import { DESTINATIONS, findDestination, type CatalogActivity, type Destination } from "./destinations.ts";
+import { childAges, describeParty, normalizeChildAges, partyMix } from "./party.ts";
 import { tasteBonus, type TasteProfile } from "./taste.ts";
 import type { Activity, BudgetBreakdown, BudgetTier, Day, Interest, Pace, Slot, Stay, StayType, Trip, TripRequest } from "./types.ts";
 
@@ -195,12 +196,19 @@ export interface ScoreContext {
 export function scoreActivity(act: CatalogActivity, index: number, ctx: ScoreContext): number {
   const { req } = ctx;
   if (matchesPhrase(act, ctx.avoid)) return -Infinity;
-  if (req.children > 0 && (act.hrs >= 9 || (!act.kids && act.cats.includes("nightlife")))) return -Infinity;
+  const mix = req.children > 0 ? partyMix(req) : undefined;
+  // Under-12s rule out very long days; any minor rules out bars and clubs.
+  const youngKids = mix ? mix.infants + mix.kids > 0 : false;
+  if (mix && ((youngKids && act.hrs >= 9) || (!act.kids && act.cats.includes("nightlife")))) return -Infinity;
   let score = 1;
   const overlap = act.cats.filter((c) => req.interests.includes(c)).length;
   score += overlap * 3;
   if (req.interests.length === 0) score += 1;
-  if (req.children > 0) score += act.kids ? 1.5 : -4;
+  if (mix) {
+    // Teens can do most adult itineraries, so only nudge; little ones need kid-friendly stops.
+    score += youngKids ? (act.kids ? 1.5 : -4) : act.kids ? 0.5 : -0.5;
+    if (mix.youngest !== undefined && mix.youngest < 5 && act.hrs >= 6) score -= 2;
+  }
   if (req.budgetTier === "shoestring") score += act.cost > 60 ? -3 : act.cost === 0 ? 1 : 0;
   if (req.budgetTier === "luxury" && act.cost >= 60) score += 1.5;
   if (req.pace === "relaxed" && act.hrs >= 6) score -= 1.5;
@@ -403,18 +411,20 @@ export function returnFareUSD(origin: string, legs: Leg[]): number {
 export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): BudgetBreakdown {
   const tier = req.budgetTier;
   const adults = Math.max(1, req.adults);
-  const kids = Math.max(0, req.children);
-  const people = adults + kids;
+  const ages = childAges(req);
+  const people = adults + ages.length;
+  // Each child as a fraction of an adult. The default age (8) gives the long-standing flat shares.
+  const share = (f: (age: number) => number) => adults + ages.reduce((s, a) => s + f(a), 0);
   const rooms = req.stayType === "apartment" || req.stayType === "resort" ? Math.max(1, Math.ceil(people / 4)) : Math.max(1, Math.ceil(adults / 2));
   const legOf = (city: string) => legs.find((l) => l.city === city) ?? legs[0];
 
   const lodging = legs.reduce((s, l) => s + l.nights * l.destination.daily[tier].lodging * rooms * STAY_MULTIPLIER[req.stayType], 0);
-  const food = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].food * (adults + kids * 0.6), 0);
+  const food = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].food * share((a) => (a < 2 ? 0.2 : a <= 12 ? 0.6 : 0.9)), 0);
   const transfers = Math.max(0, legs.length - 1) * 80 * people;
-  const localTransport = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].transport * (adults + kids * 0.5), 0) + transfers;
-  const activities = days.reduce((s, d) => s + d.activities.reduce((t, a) => t + a.estCost, 0), 0) * (adults + kids * 0.5);
+  const localTransport = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].transport * share((a) => (a < 4 ? 0 : a <= 12 ? 0.5 : 0.8)), 0) + transfers;
+  const activities = days.reduce((s, d) => s + d.activities.reduce((t, a) => t + a.estCost, 0), 0) * share((a) => (a < 4 ? 0 : a <= 12 ? 0.5 : 0.8));
   const fare = req.origin.trim() ? returnFareUSD(req.origin, legs) : 0;
-  const flights = fare * FLIGHT_MULTIPLIER[tier] * (adults + kids * 0.75);
+  const flights = fare * FLIGHT_MULTIPLIER[tier] * share((a) => (a < 2 ? 0.1 : a <= 11 ? 0.75 : 1));
 
   const out = {
     flights: round10(flights),
@@ -457,7 +467,11 @@ export function packingList(req: TripRequest, legs: Leg[]): string[] {
         else ["Packable layers", "Compact umbrella"].forEach((i) => items.add(i));
     }
   }
-  if (req.children > 0) ["Snacks and entertainment for transit", "Kids' sun protection", "Child-friendly first-aid kit"].forEach((i) => items.add(i));
+  if (req.children > 0) {
+    ["Snacks and entertainment for transit", "Kids' sun protection", "Child-friendly first-aid kit", "Passports for each child, plus a consent letter if one parent travels alone"].forEach((i) => items.add(i));
+    const { youngest } = partyMix(req);
+    if (youngest !== undefined && youngest < 3) ["Travel stroller or baby carrier", "Diapers, wipes and a change mat"].forEach((i) => items.add(i));
+  }
   if (req.interests.includes("adventure") || req.interests.includes("nature")) items.add("Daypack and trail shoes");
   if (req.interests.includes("nightlife") || req.budgetTier === "luxury") items.add("One smart outfit for dinners out");
   if (req.interests.includes("relaxation")) items.add("Swimsuit");
@@ -500,12 +514,14 @@ export function tripTitle(legs: Leg[], days: number): string {
 /** Clean and bound user input before planning. */
 export function normalizeRequest(input: TripRequest): TripRequest {
   const destinations = input.destinations.map((d) => d.trim()).filter(Boolean).slice(0, 6);
+  const children = Math.min(10, Math.max(0, Math.round(input.children || 0)));
   return {
     ...input,
     destinations: destinations.length ? destinations : ["Lisbon"],
     origin: (input.origin ?? "").trim(),
     adults: Math.min(16, Math.max(1, Math.round(input.adults || 1))),
-    children: Math.min(10, Math.max(0, Math.round(input.children || 0))),
+    children,
+    childAges: normalizeChildAges(children, input.childAges),
     interests: [...new Set(input.interests ?? [])],
     currency: isCurrency(input.currency) ? input.currency : DEFAULT_CURRENCY,
     totalBudget: input.totalBudget && input.totalBudget > 0 ? Math.round(input.totalBudget) : undefined,
@@ -540,7 +556,7 @@ export function curateTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
     why: l.destination.areas[req.stayType === "hostel" ? "shoestring" : req.budgetTier].why,
   }));
   const interestText = req.interests.length ? req.interests.slice(0, 3).join(", ") : "a bit of everything";
-  const party = `${req.adults} adult${req.adults > 1 ? "s" : ""}${req.children ? ` and ${req.children} child${req.children > 1 ? "ren" : ""}` : ""}`;
+  const party = describeParty(req);
 
   return {
     id: newId(),

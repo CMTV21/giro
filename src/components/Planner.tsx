@@ -7,6 +7,7 @@ import { addDays, formatRange, isValidISODate, nightsBetween, toISODate } from "
 import { CURRENCIES, CURRENCY_NAMES, DEFAULT_CURRENCY, currencySymbol, isCurrency } from "@/lib/currency";
 import { DESTINATIONS, findDestination } from "@/lib/destinations";
 import { checkAI, planTrip } from "@/lib/plan-client";
+import { ageLabel, describeParty, MAX_CHILD_AGE, normalizeChildAges } from "@/lib/party";
 import { topInterests } from "@/lib/taste";
 import { loadTaste } from "@/lib/taste-client";
 import { BUDGET_TIERS, INTERESTS, PACES, STAY_TYPES, type Interest, type TripRequest } from "@/lib/types";
@@ -53,6 +54,11 @@ export function Planner() {
   const params = useSearchParams();
   const [req, setReq] = useState<TripRequest>(() => initialRequest(new URLSearchParams(params.toString())));
   const [advanced, setAdvanced] = useState(params.get("mode") === "advanced");
+  // One entry per child; "" until an age is picked. Kept apart from `req` so blanks don't shift ages.
+  const [ages, setAges] = useState<string[]>(() => {
+    const given = (params.get("ages") ?? "").split(",").filter((a) => a !== "" && Number.isFinite(Number(a)));
+    return Array.from({ length: Math.max(0, Number(params.get("children")) || 0) }, (_, i) => given[i] ?? "");
+  });
   const [aiReady, setAiReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [line, setLine] = useState(0);
@@ -72,6 +78,11 @@ export function Planner() {
   }, [user, params]);
 
   const set = <K extends keyof TripRequest>(key: K, value: TripRequest[K]) => setReq((r) => ({ ...r, [key]: value }));
+  const setChildren = (n: number) => {
+    set("children", n);
+    setAges((a) => Array.from({ length: n }, (_, i) => a[i] ?? ""));
+  };
+  const childAges = normalizeChildAges(req.children, ages.filter((a) => a !== "").map(Number));
 
   // Default dates are set on the client so prerendered HTML never carries a stale date.
   useEffect(() => {
@@ -126,6 +137,7 @@ export function Planner() {
     const destinations = advanced ? cities : cities.slice(0, 1);
     const payload: TripRequest = {
       ...req,
+      childAges,
       destinations,
       ...(advanced ? {} : { mustSee: undefined, avoid: undefined, notes: undefined, totalBudget: undefined }),
       useAI: aiReady && req.useAI,
@@ -231,8 +243,24 @@ export function Planner() {
         <Section n={3} title="Who's going?">
           <div className="grid gap-3 sm:grid-cols-2">
             <Stepper label="Adults" value={req.adults} min={1} max={16} onChange={(v) => set("adults", v)} />
-            <Stepper label="Children" hint="Under 18" value={req.children} min={0} max={10} onChange={(v) => set("children", v)} />
+            <Stepper label="Children" hint="Under 18" value={req.children} min={0} max={10} onChange={setChildren} />
           </div>
+          {req.children > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium">Children&apos;s ages</p>
+              <p className="text-xs text-muted">So we pick stops that suit them and partner sites show the right fares.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {ages.map((age, i) => (
+                  <select key={i} aria-label={`Age of child ${i + 1}`} className="field w-auto py-2" value={age} onChange={(e) => setAges((a) => a.map((x, j) => (j === i ? e.target.value : x)))}>
+                    <option value="">Child {i + 1}: age?</option>
+                    {Array.from({ length: MAX_CHILD_AGE + 1 }, (_, n) => (
+                      <option key={n} value={n}>{n === 0 ? "Under 1" : `${ageLabel(n)} year${n === 1 ? "" : "s"}`}</option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
 
         <Section n={4} title="What do you love?">
@@ -313,7 +341,7 @@ export function Planner() {
             </p>
           </div>
           <dl className="space-y-3 px-6 py-5 text-sm">
-            <Row k="Travellers" v={`${req.adults} adult${req.adults > 1 ? "s" : ""}${req.children ? `, ${req.children} child${req.children > 1 ? "ren" : ""}` : ""}`} />
+            <Row k="Travellers" v={describeParty({ ...req, childAges })} />
             <Row k="Budget" v={BUDGET_META[req.budgetTier].label} />
             <Row k="Pace" v={PACE_META[req.pace].label} />
             <Row k="Into" v={req.interests.length ? req.interests.map((i) => INTEREST_META[i].label).join(", ") : "Everything"} />

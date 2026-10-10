@@ -62,6 +62,7 @@ const RequestSchema = z.object({
   endDate: date,
   adults: z.number().int().min(1).max(16),
   children: z.number().int().min(0).max(10),
+  childAges: z.array(z.number().int().min(0).max(17)).max(10).optional(),
   budgetTier: z.enum(BUDGET_TIERS),
   currency: z.enum(CURRENCIES).optional(),
   totalBudget: z.number().positive().max(100_000_000).optional(),

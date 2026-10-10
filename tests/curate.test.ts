@@ -87,7 +87,7 @@ test("booking links carry dates and party size", () => {
   assert.match(google.url, /google\.com\/travel\/flights/);
   assert.match(decodeURIComponent(expedia.url), /from:JFK,to:LIS,departure:05\/10\/2026/);
   assert.match(sky.url, /\/jfk\/lis\/260510\/260515\//);
-  assert.match(kayak.url, /JFK-LIS\/2026-05-10\/2026-05-15\/2adults\/children-11/);
+  assert.match(kayak.url, /JFK-LIS\/2026-05-10\/2026-05-15\/2adults\/children-8\?/, "unknown ages use the default");
   const [airbnb, booking] = stayLinks({ city: "Lisbon", checkIn: "2026-05-10", checkOut: "2026-05-15", adults: 2, children: 0 });
   assert.match(airbnb.url, /checkin=2026-05-10&checkout=2026-05-15&adults=2/);
   assert.match(booking.url, /group_adults=2/);

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, resolveFx, tripTitle } from "./curate.ts";
 import { FOOD } from "../data/food.ts";
 import { findDestination } from "./destinations.ts";
+import { agesKnown, describeParty } from "./party.ts";
 import type { Price } from "./food.ts";
 import type { FxSnapshot } from "./currency.ts";
 import type { TasteProfile } from "./taste.ts";
@@ -63,7 +64,7 @@ Principles:
 - Use real, specific places, restaurants and experiences that exist. Never invent venues.
 - Cluster each day geographically to minimise transit; order activities morning → afternoon → evening.
 - Respect the requested pace: relaxed ≈ 2 activities/day, balanced ≈ 3, packed ≈ 4. Arrival, transfer and departure days are lighter and must start or end with a "transit" activity.
-- Respect the party: with children, choose kid-friendly options and avoid late nightlife; honour must-sees and never include anything the traveller asked to avoid.
+- Respect the party: with children, choose options that suit their ages (toddlers need short stops and nap-friendly afternoons; teens can handle most adult plans) and avoid late nightlife; honour must-sees and never include anything the traveller asked to avoid.
 - Costs are honest per-adult USD estimates. Mark bookable=true only when advance tickets genuinely help.
 - Match the budget tier in restaurant and activity choices.
 - Tips should be practical and specific to these dates and places (seasonal events, closures, transport passes).`;
@@ -103,7 +104,7 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
     `Destinations (in order, with nights): ${legs.map((l) => `${l.city} (${l.nights} nights)`).join(" → ")}`,
     `Travelling from: ${req.origin || "not specified"}`,
     `Dates: ${req.startDate} to ${req.endDate}`,
-    `Party: ${req.adults} adults, ${req.children} children`,
+    `Party: ${describeParty(req)}${req.children && !agesKnown(req) ? " (ages not given)" : ""}`,
     `Budget tier: ${req.budgetTier}${req.totalBudget ? `, total budget about ${req.totalBudget} ${fx.currency} for the whole party (≈ ${Math.round(req.totalBudget / fx.rate)} USD)` : ""}`,
     `The traveller thinks in ${fx.currency}; still give every estCost in USD.`,
     `Pace: ${req.pace}`,

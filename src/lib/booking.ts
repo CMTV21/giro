@@ -1,6 +1,7 @@
 import { findAirport } from "./airports.ts";
 import type { Currency } from "./currency.ts";
 import { findDestination } from "./destinations.ts";
+import { childAges, partyMix } from "./party.ts";
 import type { TripRequest } from "./types.ts";
 
 /**
@@ -25,6 +26,8 @@ export interface BookingLink {
 interface Party {
   adults: number;
   children: number;
+  /** Real ages make partner prices right (child fares, infants, teens priced as adults). */
+  childAges?: number[];
   currency?: Currency;
 }
 
@@ -57,10 +60,12 @@ const env = (key: string): string | undefined => AFFILIATE[key]?.trim() || undef
 
 const enc = encodeURIComponent;
 
-function withParams(base: string, params: Record<string, string | number | undefined>): string {
+/** Arrays become repeated parameters (e.g. Booking.com's one `age` per child). */
+function withParams(base: string, params: Record<string, string | number | (string | number)[] | undefined>): string {
   const url = new URL(base);
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
+    if (Array.isArray(v)) v.forEach((x) => url.searchParams.append(k, String(x)));
+    else if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
   }
   return url.toString();
 }
@@ -101,6 +106,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
   const from = airportCode(q.origin);
   const to = airportCode(q.destination);
   const pax = q.adults + q.children;
+  const ages = childAges(q);
   const route = `${q.origin} → ${q.destination}`;
   const m = marketFor(q.currency);
   const links: BookingLink[] = [];
@@ -127,7 +133,7 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
       trip: q.ret ? "roundtrip" : "oneway",
       leg1: `from:${from},to:${to},departure:${mdy(q.depart)}TANYT`,
       leg2: q.ret ? `from:${to},to:${from},departure:${mdy(q.ret)}TANYT` : undefined,
-      passengers: `adults:${q.adults},children:${q.children}`,
+      passengers: `adults:${q.adults},children:${q.children}${ages.length ? `[${ages.join(";")}]` : ""}`,
       mode: "search",
       affcid: env("NEXT_PUBLIC_EXPEDIA_AFFCID"),
     }),
@@ -142,11 +148,12 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
       blurb: "Great for budget carriers and flexible dates.",
       url: withParams(sky, {
         adultsv2: q.adults,
-        childrenv2: q.children ? Array(q.children).fill("8").join("|") : undefined,
+        childrenv2: ages.length ? ages.join("|") : undefined,
         associateid: env("NEXT_PUBLIC_SKYSCANNER_ASSOCIATE_ID"),
       }),
     });
-    const kids = q.children ? `/children-${Array(q.children).fill("11").join("-")}` : "";
+    // Kayak writes children by age, with under-2s as lap infants ("1L").
+    const kids = ages.length ? `/children-${ages.map((a) => (a < 2 ? "1L" : String(a))).join("-")}` : "";
     links.push({
       provider: "Kayak",
       kind: "flights",
@@ -161,6 +168,9 @@ export function flightLinks(q: FlightQuery): BookingLink[] {
 export function stayLinks(q: StayQuery): BookingLink[] {
   const m = marketFor(q.currency);
   const children = q.children;
+  const ages = childAges(q);
+  const mix = partyMix(q);
+  const expediaKids = ages.length ? ages.map((a) => `1_${a}`).join(",") : undefined;
   return [
     {
       provider: "Airbnb",
@@ -170,8 +180,10 @@ export function stayLinks(q: StayQuery): BookingLink[] {
       url: withParams(`https://${m.airbnb}/s/${enc(q.city)}/homes`, {
         checkin: q.checkIn,
         checkout: q.checkOut,
-        adults: q.adults,
-        children: children || undefined,
+        // Airbnb counts 13+ as adults, 2–12 as children and under-2s as infants.
+        adults: q.adults + mix.teens,
+        children: mix.kids || undefined,
+        infants: mix.infants || undefined,
         price_max: q.maxNightly ? Math.round(q.maxNightly) : undefined,
       }),
     },
@@ -186,6 +198,7 @@ export function stayLinks(q: StayQuery): BookingLink[] {
         checkout: q.checkOut,
         group_adults: q.adults,
         group_children: children,
+        age: ages.length ? ages : undefined,
         no_rooms: Math.max(1, Math.ceil(q.adults / 2)),
         selected_currency: q.currency,
         aid: env("NEXT_PUBLIC_BOOKING_AID"),
@@ -201,7 +214,7 @@ export function stayLinks(q: StayQuery): BookingLink[] {
         startDate: q.checkIn,
         endDate: q.checkOut,
         adults: q.adults,
-        children: children ? Array(children).fill("1_8").join(",") : undefined,
+        children: expediaKids,
         affcid: env("NEXT_PUBLIC_EXPEDIA_AFFCID"),
       }),
     },
@@ -215,7 +228,7 @@ export function stayLinks(q: StayQuery): BookingLink[] {
         startDate: q.checkIn,
         endDate: q.checkOut,
         adults: q.adults,
-        children: children ? Array(children).fill("1_8").join(",") : undefined,
+        children: expediaKids,
       }),
     },
   ];
@@ -316,7 +329,7 @@ export interface LegValue {
 export function tripBookingLinks(req: TripRequest, legs: LegValue[], flightsUSD = 0) {
   const first = legs[0];
   const last = legs[legs.length - 1];
-  const base = { adults: req.adults, children: req.children, currency: req.currency };
+  const base = { adults: req.adults, children: req.children, childAges: req.childAges, currency: req.currency };
   const hasOrigin = req.origin.trim().length > 0;
   const openJaw = legs.length > 1 && first.city !== last.city;
   const withValue = (links: BookingLink[], valueUSD?: number) => links.map((l) => ({ ...l, valueUSD }));

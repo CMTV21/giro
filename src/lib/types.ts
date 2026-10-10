@@ -37,6 +37,8 @@ export interface TripRequest {
   endDate: string; // YYYY-MM-DD
   adults: number;
   children: number;
+  /** Each child's age (0–17), in the same order as entered. Optional: older trips only have a count. */
+  childAges?: number[];
   budgetTier: BudgetTier;
   /** Display currency; defaults to CAD. */
   currency?: Currency;

@@ -57,6 +57,7 @@ export function editUrl(trip: Trip): string {
     interests: r.interests.join(","),
     cur: r.currency ?? "USD",
   });
+  if (r.childAges?.length) p.set("ages", r.childAges.join(","));
   if (r.totalBudget) p.set("budget", String(r.totalBudget));
   if (r.destinations.length > 1 || r.totalBudget) p.set("mode", "advanced");
   return `/plan?${p.toString()}`;

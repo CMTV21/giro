@@ -1,4 +1,5 @@
 import { BedDouble, Car, ExternalLink, Plane, Ticket } from "lucide-react";
+import { describeParty } from "@/lib/party";
 import { experienceLinks, trackedHref, tripBookingLinks, type BookingLink } from "@/lib/booking";
 import { money, tripFx } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
@@ -30,7 +31,7 @@ export function BookPanel({ trip }: { trip: Trip }) {
 
   return (
     <div className="space-y-10">
-      <Group icon={<Plane className="h-5 w-5" />} title="Flights" subtitle={req.origin ? `For ${req.adults + req.children} traveller${req.adults + req.children > 1 ? "s" : ""}, dates pre-filled.` : "Add a departure city in the planner to search flights."}>
+      <Group icon={<Plane className="h-5 w-5" />} title="Flights" subtitle={req.origin ? `For ${describeParty(req)}, dates pre-filled.` : "Add a departure city in the planner to search flights."}>
         {links.flights.length ? (
           links.flights.map((g) => (
             <div key={g.title} className="space-y-3">
