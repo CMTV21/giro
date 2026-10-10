@@ -77,6 +77,10 @@ export interface Activity {
   start?: string;
   /** Map position, when known (from Wikipedia or geocoding). */
   place?: { lat: number; lon: number };
+  /** The traveller's own note (reservation number, who's meeting where). Shared with the trip's group. */
+  note?: string;
+  /** Added or renamed by the traveller rather than picked from the catalog. */
+  custom?: boolean;
 }
 
 /** A flight the traveller has booked. Times are local wall-clock times at each airport. */

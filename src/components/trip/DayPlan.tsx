@@ -15,7 +15,9 @@ import { clock, dayWindow, scheduleDay, toMinutes, type ScheduledItem } from "@/
 import type { VoteTally } from "@/lib/storage";
 import { loadTaste, recordSignal } from "@/lib/taste-client";
 import type { Activity, Day, Slot, Trip } from "@/lib/types";
+import { applyStopEdit, customStop, draftFrom, emptyDraft, placeBySlot } from "@/lib/plan-edit";
 import { ActivityCard, DragHandle } from "./ActivityCard";
+import { StopEditor } from "./StopEditor";
 
 export interface DayGroupProps {
   votes?: Record<string, VoteTally>;
@@ -42,6 +44,9 @@ export function DayPlan({
 }: { trip: Trip; day: Day; onChange: (day: Day) => void; onPark: (a: Activity, reason: string) => void } & DayGroupProps) {
   const [swapping, setSwapping] = useState<string>();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string>();
+  const fx = tripFx(trip);
+  const shared = Boolean(onVote);
   const window = dayWindow(trip, day);
   const items = scheduleDay(trip, day, window);
   const timed = new Map(items.filter((i) => i.activity).map((i) => [i.activity!.id, i]));
@@ -96,7 +101,7 @@ export function DayPlan({
                       <ActivityCard
                         activity={a}
                         city={day.city}
-                        fx={tripFx(trip)}
+                        fx={fx}
                         tripId={trip.id}
                         time={timed.get(a.id)}
                         caution={accessCaution(effortOf({ key: a.ref ?? "", hrs: a.durationHrs }), trip.request.access)}
@@ -113,6 +118,7 @@ export function DayPlan({
                           },
                           onSetStart: (hhmm) => update(day.activities.map((x) => (x.id === a.id ? { ...x, start: hhmm } : x))),
                           onSwap: a.category === "transit" ? undefined : () => setSwapping(swapping === a.id ? undefined : a.id),
+                          onEdit: () => setEditing(editing === a.id ? undefined : a.id),
                           readOnly,
                           votes: votes?.[a.id],
                           onVote: onVote
@@ -123,6 +129,22 @@ export function DayPlan({
                             : undefined,
                         }}
                       />
+                      {editing === a.id && (
+                        <StopEditor
+                          mode="edit"
+                          initial={draftFrom(a, fx.rate)}
+                          fx={fx}
+                          shared={shared}
+                          onCancel={() => setEditing(undefined)}
+                          onSave={(fields) => {
+                            const edited = applyStopEdit(a, fields);
+                            const without = day.activities.filter((x) => x.id !== a.id);
+                            // Same time of day: keep its place. New time of day: move it there.
+                            update(edited.slot === a.slot ? day.activities.map((x) => (x.id === a.id ? edited : x)) : placeBySlot(without, edited));
+                            setEditing(undefined);
+                          }}
+                        />
+                      )}
                       {swapping === a.id && (
                         <SwapPanel
                           trip={trip}
@@ -159,15 +181,21 @@ export function DayPlan({
       {!readOnly && (
         <div className="no-print ml-14">
           {adding ? (
-            <AddStop
-              onCancel={() => setAdding(false)}
-              onAdd={(a) => {
-                const order: Record<Slot, number> = { morning: 0, afternoon: 1, evening: 2 };
-                recordSignal("added", a.category);
-                update([...day.activities, a].sort((x, y) => order[x.slot] - order[y.slot]));
-                setAdding(false);
-              }}
-            />
+            <div className="-ml-14">
+              <StopEditor
+                mode="add"
+                initial={emptyDraft()}
+                fx={fx}
+                shared={shared}
+                onCancel={() => setAdding(false)}
+                onSave={(fields) => {
+                  const a = customStop(fields, newId());
+                  recordSignal("added", a.category);
+                  update(placeBySlot(day.activities, a));
+                  setAdding(false);
+                }}
+              />
+            </div>
           ) : (
             <button type="button" onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink-soft hover:bg-sand hover:text-ink">
               <Plus className="h-4 w-4" /> Add your own stop
@@ -243,37 +271,5 @@ function SwapPanel({ trip, day, slot, onPick, onClose }: { trip: Trip; day: Day;
         <p className="text-sm text-muted">You&apos;ve already got our best picks for this slot. Browse Ideas or add your own stop.</p>
       )}
     </div>
-  );
-}
-
-function AddStop({ onAdd, onCancel }: { onAdd: (a: Activity) => void; onCancel: () => void }) {
-  const [title, setTitle] = useState("");
-  const [slot, setSlot] = useState<Slot>("afternoon");
-  const [area, setArea] = useState("");
-  const [hours, setHours] = useState("2");
-  return (
-    <form
-      className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 sm:flex-row sm:flex-wrap sm:items-center"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-        onAdd({ id: newId(), title: title.trim(), description: "Added by you.", category: "culture", slot, durationHrs: Math.min(12, Math.max(0.5, Number(hours) || 2)), estCost: 0, area: area.trim() || undefined });
-      }}
-    >
-      <input autoFocus className="field py-2 sm:flex-1" placeholder="What do you want to do?" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Stop name" />
-      <input className="field py-2 sm:max-w-40" placeholder="Area (optional)" value={area} onChange={(e) => setArea(e.target.value)} aria-label="Area" />
-      <select className="field py-2 sm:max-w-32" value={slot} onChange={(e) => setSlot(e.target.value as Slot)} aria-label="Time of day">
-        <option value="morning">Morning</option>
-        <option value="afternoon">Afternoon</option>
-        <option value="evening">Evening</option>
-      </select>
-      <select className="field py-2 sm:max-w-28" value={hours} onChange={(e) => setHours(e.target.value)} aria-label="How long">
-        {["0.5", "1", "1.5", "2", "3", "4", "6"].map((h) => <option key={h} value={h}>{h}h</option>)}
-      </select>
-      <div className="flex gap-2">
-        <button type="submit" className="btn-dark py-2">Add</button>
-        <button type="button" className="btn-ghost py-2" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
   );
 }

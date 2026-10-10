@@ -27,6 +27,8 @@ const ActivitySchema = z.object({
   ref: str(80).optional(),
   start: z.string().regex(/^\d{1,2}:\d{2}$/).optional(),
   place: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).optional(),
+  note: str(500).optional(),
+  custom: z.boolean().optional(),
 });
 
 const time = z.string().regex(/^\d{1,2}:\d{2}$/);

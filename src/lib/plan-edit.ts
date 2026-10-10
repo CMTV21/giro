@@ -89,13 +89,91 @@ const SLOT_ORDER: Record<Slot, number> = { morning: 0, afternoon: 1, evening: 2 
 export function addActivity(trip: Trip, dayIndex: number, activity: Activity): Trip {
   const day = trip.days[dayIndex];
   if (!day) return trip;
-  const list = day.activities;
+  const next = placeBySlot(day.activities, activity);
+  return { ...trip, days: trip.days.map((d) => (d.index === dayIndex ? { ...d, activities: next } : d)) };
+}
+
+/** Insert a stop at the start of its slot's place in the day, keeping arrival first and departure last. */
+export function placeBySlot(list: Activity[], activity: Activity): Activity[] {
   const want = SLOT_ORDER[activity.slot];
   let at = list.findIndex((x) => x.category !== "transit" && SLOT_ORDER[x.slot] >= want);
   if (at < 0) at = list.length;
   // Arrival stays first and departure stays last.
   if (at === 0 && list[0]?.category === "transit" && list.length > 1) at = 1;
   if (at === list.length && list.at(-1)?.category === "transit" && list.length > 1) at = list.length - 1;
-  const next = [...list.slice(0, at), activity, ...list.slice(at)];
-  return { ...trip, days: trip.days.map((d) => (d.index === dayIndex ? { ...d, activities: next } : d)) };
+  return [...list.slice(0, at), activity, ...list.slice(at)];
 }
+
+/** What the stop editor collects. Cost is in the trip's currency; the plan stores USD. */
+export interface StopDraft {
+  title: string;
+  description: string;
+  category: Activity["category"];
+  slot: Slot;
+  durationHrs: number;
+  costLocal: number;
+  area: string;
+  note: string;
+  /** "HH:MM" to pin a start time, or "" to let Giro schedule it. */
+  start: string;
+}
+
+export const MAX_STOP_HOURS = 12;
+
+/** Bound and tidy a draft. `rate` is trip-currency units per USD. */
+export function cleanDraft(d: StopDraft, rate: number): { ok: true; fields: Omit<Activity, "id"> } | { ok: false; error: string } {
+  const title = d.title.trim().slice(0, 160);
+  if (!title) return { ok: false, error: "Give the stop a name." };
+  // Quarter-hour steps, from 15 minutes to 12 hours.
+  const durationHrs = Math.min(MAX_STOP_HOURS, Math.max(0.25, Math.round((Number(d.durationHrs) || 0) * 4) / 4));
+  const local = Math.max(0, Number(d.costLocal) || 0);
+  const estCost = rate > 0 ? Math.min(10_000_000, Math.round((local / rate) * 100) / 100) : 0;
+  const start = /^([01]?\d|2[0-3]):[0-5]\d$/.test(d.start) ? d.start : undefined;
+  return {
+    ok: true,
+    fields: {
+      title,
+      description: d.description.trim().slice(0, 600),
+      category: d.category,
+      slot: d.slot,
+      durationHrs,
+      estCost,
+      area: d.area.trim().slice(0, 120) || undefined,
+      note: d.note.trim().slice(0, 500) || undefined,
+      start,
+    },
+  };
+}
+
+/** Apply an edit. Renaming a catalog stop makes it your own (it no longer stands for the catalog pick). */
+export function applyStopEdit(a: Activity, fields: Omit<Activity, "id">): Activity {
+  const renamed = fields.title !== a.title;
+  return {
+    ...a,
+    ...fields,
+    ref: renamed ? undefined : a.ref,
+    custom: renamed ? true : a.custom,
+    // A renamed stop's map pin and photo belonged to the old place.
+    place: renamed ? undefined : a.place,
+    bookable: renamed ? undefined : a.bookable,
+  };
+}
+
+export const customStop = (fields: Omit<Activity, "id">, id: string): Activity => ({ ...fields, id, custom: true });
+
+/** Editor defaults for an existing stop. */
+export function draftFrom(a: Activity, rate: number): StopDraft {
+  return {
+    title: a.title,
+    description: a.description === "Added by you." ? "" : a.description,
+    category: a.category,
+    slot: a.slot,
+    durationHrs: a.durationHrs,
+    costLocal: Math.round(a.estCost * rate),
+    area: a.area ?? "",
+    note: a.note ?? "",
+    start: a.start ?? "",
+  };
+}
+
+export const emptyDraft = (slot: Slot = "afternoon"): StopDraft => ({ title: "", description: "", category: "culture", slot, durationHrs: 2, costLocal: 0, area: "", note: "", start: "" });

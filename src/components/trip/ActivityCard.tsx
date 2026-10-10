@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pin, Shuffle, Star, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
+import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
@@ -21,6 +21,7 @@ export interface ActivityTime {
 
 export interface ActivityActions {
   onSwap?: () => void;
+  onEdit?: () => void;
   /** Takes the stop out of the plan and into Ideas, so nothing is lost. */
   onRemove: () => void;
   onToggleBooked: () => void;
@@ -133,10 +134,15 @@ export function ActivityCard({
         <div className="mt-1.5 flex gap-3">
           <div className="min-w-0 flex-1">
             <h4 className="text-[17px] leading-snug font-semibold">{a.title}</h4>
-            <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>
+            {a.description && a.description !== "Added by you." && <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>}
           </div>
           {!isTransit && !isFree && <PlacePhoto title={a.title} city={city} durationHrs={a.durationHrs} query={{ strict: restaurant }} className="mt-0.5 h-20 w-24 sm:h-24 sm:w-32" />}
         </div>
+        {a.note && (
+          <p className="mt-2.5 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm whitespace-pre-line text-amber-950">
+            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /> <span><span className="sr-only">Note: </span>{a.note}</span>
+          </p>
+        )}
         {a.tip && (
           <p className="mt-2.5 flex gap-2 rounded-xl bg-sand/70 px-3 py-2 text-sm text-ink-soft">
             <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand" /> {a.tip}
@@ -172,6 +178,7 @@ export function ActivityCard({
           {!actions.readOnly && (
             <span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
               {a.bookable && <IconBtn label={a.booked ? "Mark as not booked" : "Mark as booked"} onClick={actions.onToggleBooked}><CircleCheck className={`h-4 w-4 ${a.booked ? "text-sea" : ""}`} /></IconBtn>}
+              {actions.onEdit && <IconBtn label="Edit stop or add a note" onClick={actions.onEdit}><Pencil className="h-4 w-4" /></IconBtn>}
               {actions.onSwap && <IconBtn label="Swap for something else" onClick={actions.onSwap}><Shuffle className="h-4 w-4" /></IconBtn>}
               {!isTransit && <IconBtn label="Move to Ideas" onClick={actions.onRemove}><ArchiveRestore className="h-4 w-4" /></IconBtn>}
             </span>
