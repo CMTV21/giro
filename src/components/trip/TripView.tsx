@@ -331,6 +331,12 @@ export function TripView() {
             <BookingsPanel
               trip={trip}
               readOnly={readOnly}
+              remote={bundle.remote}
+              onRemoteChange={(message) => {
+                // The server changed the saved trip; fetch it so the page shows the new bookings.
+                void load();
+                flash(message);
+              }}
               onChange={(c) => {
                 // Booked prices replace estimates in the budget.
                 commit(recalcBudget(c.trip));

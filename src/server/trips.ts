@@ -164,6 +164,24 @@ export async function updateTrip(tripId: string, userId: string, input: unknown,
   return { version: Number(row.version) };
 }
 
+/**
+ * Change a trip on the server's behalf (no user session), retrying if someone saves in between.
+ * `fn` returns the new trip, or undefined to leave it unchanged.
+ */
+export async function mutateTrip<R>(tripId: string, fn: (trip: Trip) => Promise<{ trip: Trip; result: R } | undefined>): Promise<R | undefined> {
+  const db = await getDb();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [row] = await db.query<{ data: unknown; version: number }>("select data, version from trips where id = $1", [tripId]);
+    if (!row) throw notFound("That trip");
+    const change = await fn(validTrip(json(row.data)));
+    if (!change) return undefined;
+    const next = validTrip(change.trip);
+    const [saved] = await db.query("update trips set data = $2::jsonb, version = version + 1, updated_at = now() where id = $1 and version = $3 returning version", [tripId, JSON.stringify(next), row.version]);
+    if (saved) return change.result;
+  }
+  throw new HttpError(409, "conflict", "The trip kept changing; try again.");
+}
+
 export async function deleteOrLeaveTrip(tripId: string, userId: string): Promise<"deleted" | "left"> {
   const db = await getDb();
   const role = await requireRole(db, tripId, userId, "viewer");

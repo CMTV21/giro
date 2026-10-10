@@ -139,4 +139,19 @@ export const MIGRATIONS: string[][] = [
       primary key (trip_id, purpose)
     )`,
   ],
+  [
+    // Confirmations forwarded to a trip's address. Mail from members is applied straight away;
+    // anything else waits for a member to add or dismiss it.
+    `create table trip_inbox (
+      id text primary key,
+      trip_id text not null references trips(id) on delete cascade,
+      sender text not null,
+      subject text not null,
+      status text not null check (status in ('applied', 'pending', 'dismissed', 'empty', 'failed')),
+      summary text not null default '',
+      extracted jsonb,
+      created_at timestamptz not null default now()
+    )`,
+    `create index trip_inbox_trip_idx on trip_inbox(trip_id, created_at)`,
+  ],
 ];

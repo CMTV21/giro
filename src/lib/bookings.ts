@@ -1,6 +1,7 @@
 import { airportCode } from "./booking.ts";
 import { newId } from "./curate.ts";
 import { normalizeCity } from "./destinations.ts";
+import { fitToFlights } from "./schedule.ts";
 import type { Flight, Paid, StayBooking, Trip } from "./types.ts";
 
 const valid = (date: string, time: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{1,2}:\d{2}$/.test(time);
@@ -98,4 +99,50 @@ export function draftFlight(trip: Trip, kind: Flight["kind"]): Flight {
     return { ...base, kind, from: airportCode(first), to: airportCode(leg?.city ?? last), departDate: leg?.checkIn ?? r.startDate, departTime: "10:00", arriveDate: leg?.checkIn ?? r.startDate, arriveTime: "12:00" };
   }
   return { ...base, kind, from: r.origin ? airportCode(r.origin) : "", to: airportCode(first), departDate: r.startDate, departTime: "08:00", arriveDate: r.startDate, arriveTime: "14:00" };
+}
+
+export interface BookingsChange {
+  trip: Trip;
+  message?: string;
+}
+
+/** Apply flight changes and re-fit the plan, explaining anything that moved. */
+export function withFlights(trip: Trip, flights: Flight[]): BookingsChange {
+  const { trip: fitted, moved, warnings } = fitToFlights({ ...trip, flights });
+  const parts: string[] = [];
+  if (moved.length) parts.push(`${moved.length} stop${moved.length > 1 ? "s" : ""} no longer fit around your flights, so ${moved.length > 1 ? "they're" : "it's"} in Ideas, ready to drag back in.`);
+  parts.push(...warnings);
+  return { trip: fitted, message: parts.join(" ") || undefined };
+}
+
+/** What a confirmation reader returns (from an upload or a forwarded email). */
+export interface ExtractedBookingLike {
+  flights?: ExtractedFlight[];
+  stays?: ExtractedStay[];
+  flightsTotal?: number;
+  flightsCurrency?: string;
+}
+
+/**
+ * Merge a read confirmation into a trip: new flights (skipping ones already there), stays matched
+ * to legs, and totals as what was paid. `toPaid` converts a total, or returns undefined when it can't.
+ * Returns undefined when the confirmation held nothing usable.
+ */
+export async function mergeBooking(
+  trip: Trip,
+  found: ExtractedBookingLike,
+  toPaid: (total: number | undefined, currency: string | undefined) => Promise<Paid | undefined>,
+): Promise<(BookingsChange & { flights: number; stays: number; summary: string }) | undefined> {
+  const flights = toFlights(trip, found.flights ?? []);
+  const known = new Set((trip.flights ?? []).map((f) => `${f.flightNumber}|${f.departDate}`));
+  const fresh = flights.filter((f) => !f.flightNumber || !known.has(`${f.flightNumber}|${f.departDate}`));
+  // The whole flight booking's total goes on its first new flight.
+  const flightsPaid = await toPaid(found.flightsTotal, found.flightsCurrency);
+  if (flightsPaid && fresh[0]) fresh[0] = { ...fresh[0], paid: flightsPaid };
+  const stays = await Promise.all((found.stays ?? []).map(async (s) => ({ ...s, paid: await toPaid(s.total, s.currency) })));
+  const { trip: withStay, matched } = applyStays(trip, stays);
+  if (!fresh.length && !matched) return undefined;
+  const change = withFlights(withStay, [...(trip.flights ?? []), ...fresh]);
+  const summary = [fresh.length && `${fresh.length} flight${fresh.length > 1 ? "s" : ""}`, matched && `${matched} stay${matched > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
+  return { ...change, flights: fresh.length, stays: matched, summary };
 }

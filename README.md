@@ -25,6 +25,7 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Notes & packing**: trip notepad and stop notes shared with the group, your own packing items, and a heads-up on scams, pickpockets and local rules per city |
 | | **Community picks**: "Loved by N travellers" once at least 3 travellers book, pick or vote for a stop |
 | | **Eat & drink**: must-try dishes and hand-picked restaurants for all 26 catalog cities (Giro AI writes one for other cities), with live Tripadvisor rankings and one-tap "add to a day" at the right meal |
+| | **Forward your bookings**: each trip has an email address; forwarded confirmations are read and added (from members at once, from others after approval) |
 | | **Official travel advice**: Government of Canada advisory level for every country on a trip and on guides, with a "raised since you last looked" flag |
 | | **Live calendar**: subscribe in Google, Apple or Outlook Calendar and it follows every change to the plan; links can be switched off and replaced |
 | | **Trip guides** (`/guides`): public, indexable 3-, 5- and 7-day itineraries for every catalog city (a length is published only when every day is full), with where to stay, what to eat, a daily budget and "Make this trip mine" |
@@ -52,6 +53,7 @@ Configuration lives in `.env.local` (see `.env.example`). Everything is optional
 | `EMAIL_FROM` | Sender address once your domain is verified in Resend, e.g. `Giro <hello@yourdomain.com>`. |
 | `APP_URL` | Public address used in email links. Defaults to the Vercel production URL; it is never taken from request headers. |
 | `NEXT_PUBLIC_MAP_TILE_URL` / `NEXT_PUBLIC_MAP_ATTRIBUTION` | Map tiles for day maps and guides. Defaults to OpenStreetMap's public tiles, which are fine for light use; switch to a provider such as MapTiler or Stadia (free tiers) before heavy traffic. |
+| `INBOUND_SECRET` / `INBOUND_ADDRESS` | Forward-your-bookings email: a shared secret with the Cloudflare Email Worker, and the base address (e.g. `trips@girotrips.com`). Setup steps in `workers/inbound-email/README.md`. Off until both are set. |
 | `CONTACT_EMAIL` | Privacy and legal contact shown on `/privacy`, `/terms` and `/affiliate-disclosure` (redeploy after changing). |
 
 ## Growing the city catalog

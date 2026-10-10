@@ -1,5 +1,5 @@
 import "server-only";
-import { FALLBACK_AS_OF, FALLBACK_RATES, PAY_CURRENCIES, parseExtraRates, parseRates, type Currency, type PayCurrency } from "./currency";
+import { FALLBACK_AS_OF, FALLBACK_RATES, PAY_CURRENCIES, parseExtraRates, parseRates, type Currency, type PayCurrency } from "./currency.ts";
 
 export interface RateTable {
   rates: Record<Currency, number>;

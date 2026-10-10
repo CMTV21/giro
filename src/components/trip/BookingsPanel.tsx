@@ -2,32 +2,20 @@
 
 import { BedDouble, FileUp, LoaderCircle, Pencil, Plane, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { applyStays, draftFlight, toFlights, type ExtractedFlight, type ExtractedStay } from "@/lib/bookings";
+import { draftFlight, mergeBooking, withFlights, type BookingsChange, type ExtractedFlight, type ExtractedStay } from "@/lib/bookings";
+export type { BookingsChange };
 import { formatDate } from "@/lib/dates";
 import { isPayCurrency, PAY_CURRENCIES, type PayCurrency } from "@/lib/currency";
 import { tripFx } from "@/lib/money";
 import { checkAI, paidToUsd } from "@/lib/plan-client";
-import { clock, fitToFlights, toMinutes } from "@/lib/schedule";
+import { clock, toMinutes } from "@/lib/schedule";
 import { ApiError } from "@/lib/storage";
+import { ForwardInbox } from "./ForwardInbox";
 import type { Flight, Paid, StayBooking, Trip } from "@/lib/types";
 
 const KIND_LABEL: Record<Flight["kind"], string> = { outbound: "Flight out", return: "Flight home", between: "Between cities" };
 
-export interface BookingsChange {
-  trip: Trip;
-  message?: string;
-}
-
-/** Apply flight changes and re-fit the plan, explaining anything that moved. */
-export function withFlights(trip: Trip, flights: Flight[]): BookingsChange {
-  const { trip: fitted, moved, warnings } = fitToFlights({ ...trip, flights });
-  const parts: string[] = [];
-  if (moved.length) parts.push(`${moved.length} stop${moved.length > 1 ? "s" : ""} no longer fit around your flights, so ${moved.length > 1 ? "they're" : "it's"} in Ideas, ready to drag back in.`);
-  parts.push(...warnings);
-  return { trip: fitted, message: parts.join(" ") || undefined };
-}
-
-export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOnly: boolean; onChange: (c: BookingsChange) => void }) {
+export function BookingsPanel({ trip, readOnly, remote, onChange, onRemoteChange }: { trip: Trip; readOnly: boolean; remote?: boolean; onChange: (c: BookingsChange) => void; onRemoteChange?: (message: string) => void }) {
   const [editing, setEditing] = useState<Flight>();
   const [stayEdit, setStayEdit] = useState<number>();
   const [ai, setAi] = useState(false);
@@ -59,21 +47,12 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
       const res = await fetch("/api/extract/booking", { method: "POST", body });
       const json = (await res.json().catch(() => ({}))) as { flights?: ExtractedFlight[]; stays?: ExtractedStay[]; flightsTotal?: number; flightsCurrency?: string; message?: string };
       if (!res.ok) throw new ApiError(res.status, "error", json.message ?? "We couldn't read that file.");
-      const found = toFlights(trip, json.flights ?? []);
-      const known = new Set((trip.flights ?? []).map((f) => `${f.flightNumber}|${f.departDate}`));
-      const fresh = found.filter((f) => !f.flightNumber || !known.has(`${f.flightNumber}|${f.departDate}`));
-      // Totals on the confirmation become what you paid (the whole flight booking goes on its first flight).
-      const flightsPaid = await importedPaid(json.flightsTotal, json.flightsCurrency);
-      if (flightsPaid && fresh[0]) fresh[0] = { ...fresh[0], paid: flightsPaid };
-      const stays = await Promise.all((json.stays ?? []).map(async (s) => ({ ...s, paid: await importedPaid(s.total, s.currency) })));
-      const { trip: withStay, matched } = applyStays(trip, stays);
-      if (!fresh.length && !matched) {
+      const merged = await mergeBooking(trip, json, importedPaid);
+      if (!merged) {
         setError("We didn't find any flights or stays in that document. Add them by hand below.");
         return;
       }
-      const change = withFlights(withStay, [...(trip.flights ?? []), ...fresh]);
-      const added = [fresh.length && `${fresh.length} flight${fresh.length > 1 ? "s" : ""}`, matched && `${matched} stay${matched > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
-      onChange({ trip: change.trip, message: [`Added ${added} from your confirmation. Please check the details.`, change.message].filter(Boolean).join(" ") });
+      onChange({ trip: merged.trip, message: [`Added ${merged.summary} from your confirmation. Please check the details.`, merged.message].filter(Boolean).join(" ") });
     } catch (err) {
       setError(err instanceof Error ? err.message : "We couldn't read that file.");
     } finally {
@@ -94,6 +73,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
         )}
       </div>
       <p className="mt-1 text-sm text-muted">Add your booked flights and where you&apos;re staying. Giro times each day around them.</p>
+      {remote && onRemoteChange && <ForwardInbox tripId={trip.id} readOnly={readOnly} onApplied={onRemoteChange} />}
       {error && <p role="alert" className="mt-3 rounded-xl bg-brand-soft px-3 py-2 text-sm text-brand-dark">{error}</p>}
 
       <ul className="mt-4 space-y-2">
