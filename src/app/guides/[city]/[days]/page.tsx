@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DayMapToggle } from "@/components/trip/DayMap";
+import { AdvisoryRows } from "@/components/trip/AdvisoryNotice";
 import { HeadsUpCard } from "@/components/trip/HeadsUp";
+import { ADVISORY_SOURCE, COUNTRY_ISO, HOME_ISO } from "@/lib/advisories";
+import { loadAdvisories } from "@/server/advisories";
 import { PlacePhoto } from "@/components/trip/PlacePhoto";
 import { FOOD } from "@/data/food";
 import { experienceLinks, reviewsLink, stayLinks, trackedHref } from "@/lib/booking";
@@ -47,7 +50,9 @@ const TIER_LABEL = { shoestring: "Shoestring", comfort: "Comfort", luxury: "Luxu
 
 export default async function GuidePage({ params }: Props) {
   const { dest, n } = await load(params);
-  const rates = await getRates();
+  const [rates, advisories] = await Promise.all([getRates(), loadAdvisories()]);
+  const iso = COUNTRY_ISO[dest.country];
+  const advisory = iso && iso !== HOME_ISO ? advisories.get(iso) : undefined;
   const fx: FxSnapshot = { currency: "CAD", rate: rates.rates.CAD, asOf: rates.asOf, source: rates.source };
   const trip = buildGuide(dest, n, fx);
   const money = (usd: number) => formatMoney(usd, fx, { approx: true });
@@ -191,6 +196,14 @@ export default async function GuidePage({ params }: Props) {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {advisory && (
+        <section className="mt-14" aria-labelledby="advisory-title">
+          <h2 id="advisory-title" className="mb-3 font-semibold">Official travel advice for Canadians</h2>
+          <AdvisoryRows advisories={[advisory]} />
+          <p className="mt-2 text-xs text-muted">From the {ADVISORY_SOURCE} (travel.gc.ca), refreshed every few hours. Always check before you go.</p>
         </section>
       )}
 

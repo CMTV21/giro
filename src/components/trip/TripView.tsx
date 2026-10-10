@@ -17,6 +17,7 @@ import { BUDGET_META, PACE_META } from "../meta";
 import { useSession } from "../SessionProvider";
 import { CalendarDialog } from "./CalendarDialog";
 import { ChangeDates } from "./ChangeDates";
+import { AdvisoryNotice } from "./AdvisoryNotice";
 import { BookPanel } from "./BookPanel";
 import { BudgetPanel } from "./BudgetPanel";
 import { BookingsPanel } from "./BookingsPanel";
@@ -326,6 +327,7 @@ export function TripView() {
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         {tab === "itinerary" && (
           <div className="space-y-8">
+            <AdvisoryNotice trip={trip} readOnly={readOnly} onSeen={(seen) => latest.current && commit({ ...latest.current.trip, advisorySeen: seen })} />
             <BookingsPanel
               trip={trip}
               readOnly={readOnly}

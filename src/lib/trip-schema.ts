@@ -120,6 +120,7 @@ export const TripSchema = z.object({
   notes: str(5000).optional(),
   flights: z.array(FlightSchema).max(12).optional(),
   parked: z.array(ActivitySchema.extend({ city: str(80), reason: str(200).optional() })).max(100).optional(),
+  advisorySeen: z.record(z.string().regex(/^[A-Z]{2}$/), z.number().int().min(0).max(3)).refine((r) => Object.keys(r).length <= 12).optional(),
   food: z
     .array(
       z.object({

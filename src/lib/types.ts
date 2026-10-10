@@ -187,6 +187,8 @@ export interface Trip {
   notes?: string;
   flights?: Flight[];
   parked?: ParkedIdea[];
+  /** Government of Canada advisory level last shown per country (ISO), to flag increases. */
+  advisorySeen?: Record<string, number>;
   /** Giro AI's dishes and restaurants for cities outside the curated catalog. */
   food?: Omit<CityFood, "source">[];
 }
