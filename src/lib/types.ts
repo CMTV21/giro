@@ -1,3 +1,4 @@
+import type { AccessNeed } from "./access.ts";
 import type { Currency, FxSnapshot } from "./currency.ts";
 import type { CityFood } from "./food.ts";
 
@@ -49,6 +50,8 @@ export interface TripRequest {
   stayType: StayType;
   mustSee?: string;
   avoid?: string;
+  /** Mobility needs that rule out or down-rank unsuitable stops. */
+  access?: AccessNeed[];
   notes?: string;
   /** Ask Claude to curate the trip (falls back to the built-in engine if unavailable). */
   useAI?: boolean;

@@ -58,8 +58,12 @@ export function editUrl(trip: Trip): string {
     cur: r.currency ?? "USD",
   });
   if (r.childAges?.length) p.set("ages", r.childAges.join(","));
+  if (r.access?.length) p.set("access", r.access.join(","));
+  if (r.avoid) p.set("avoid", r.avoid);
+  if (r.notes) p.set("notes", r.notes);
+  if (r.mustSee) p.set("must", r.mustSee);
   if (r.totalBudget) p.set("budget", String(r.totalBudget));
-  if (r.destinations.length > 1 || r.totalBudget) p.set("mode", "advanced");
+  if (r.destinations.length > 1 || r.totalBudget || r.mustSee) p.set("mode", "advanced");
   return `/plan?${p.toString()}`;
 }
 

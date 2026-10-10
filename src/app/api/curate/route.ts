@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ACCESS_NEEDS } from "@/lib/access";
 import { AIRefusalError, aiAvailable, curateWithClaude } from "@/lib/ai";
 import { CURRENCIES } from "@/lib/currency";
 import { isValidISODate, nightsBetween } from "@/lib/dates";
@@ -27,6 +28,7 @@ const RequestSchema = z.object({
   stayType: z.enum(STAY_TYPES),
   mustSee: z.string().max(500).optional(),
   avoid: z.string().max(500).optional(),
+  access: z.array(z.enum(ACCESS_NEEDS)).max(ACCESS_NEEDS.length).optional(),
   notes: z.string().max(1000).optional(),
   useAI: z.boolean().optional(),
   taste: z.unknown().optional(),

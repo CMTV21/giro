@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACCESS_NEEDS } from "./access.ts";
 import { CURRENCIES } from "./currency.ts";
 import { BUDGET_TIERS, INTERESTS, PACES, STAY_TYPES, type Trip } from "./types.ts";
 
@@ -71,6 +72,7 @@ const RequestSchema = z.object({
   stayType: z.enum(STAY_TYPES),
   mustSee: str(500).optional(),
   avoid: str(500).optional(),
+  access: z.array(z.enum(ACCESS_NEEDS)).max(ACCESS_NEEDS.length).optional(),
   notes: str(1000).optional(),
   useAI: z.boolean().optional(),
 });

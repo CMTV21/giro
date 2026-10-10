@@ -38,6 +38,7 @@ export function ActivityCard({
   fx,
   tripId,
   time,
+  caution,
   handle,
   extra,
   actions,
@@ -47,6 +48,8 @@ export function ActivityCard({
   fx: FxSnapshot;
   tripId?: string;
   time?: ActivityTime;
+  /** Why this stop may not suit the traveller's access needs. */
+  caution?: string;
   /** Drag handle (supplied by the sortable wrapper). */
   handle?: React.ReactNode;
   /** Extra content under the description, e.g. history and facts. */
@@ -120,6 +123,11 @@ export function ActivityCard({
         {(time?.conflict || time?.overflow) && (
           <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
             <TriangleAlert className="h-3.5 w-3.5" /> {time.conflict ?? "Runs past the end of the day, or past your flight cut-off."}
+          </p>
+        )}
+        {caution && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800" title="Based on Giro's guidance. Check with the venue.">
+            <TriangleAlert className="h-3.5 w-3.5" /> {caution}: may not suit your access needs
           </p>
         )}
         <div className="mt-1.5 flex gap-3">

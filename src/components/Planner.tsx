@@ -7,6 +7,7 @@ import { addDays, formatRange, isValidISODate, nightsBetween, toISODate } from "
 import { CURRENCIES, CURRENCY_NAMES, DEFAULT_CURRENCY, currencySymbol, isCurrency } from "@/lib/currency";
 import { DESTINATIONS, findDestination } from "@/lib/destinations";
 import { checkAI, planTrip } from "@/lib/plan-client";
+import { ACCESS_LABELS, ACCESS_NEEDS, isAccessNeed, type AccessNeed } from "@/lib/access";
 import { ageLabel, describeParty, MAX_CHILD_AGE, normalizeChildAges } from "@/lib/party";
 import { topInterests } from "@/lib/taste";
 import { loadTaste } from "@/lib/taste-client";
@@ -45,6 +46,10 @@ function initialRequest(params: URLSearchParams): TripRequest {
     pace: "balanced",
     interests: interests.length ? interests : ["culture", "food"],
     stayType: "hotel",
+    access: (params.get("access") ?? "").split(",").filter(isAccessNeed),
+    avoid: params.get("avoid")?.slice(0, 500) || undefined,
+    notes: params.get("notes")?.slice(0, 1000) || undefined,
+    mustSee: params.get("must")?.slice(0, 500) || undefined,
     useAI: false,
   };
 }
@@ -123,6 +128,9 @@ export function Planner() {
     return undefined;
   }, [cities.length, req.startDate, req.endDate, nights]);
 
+  const toggleAccess = (n: AccessNeed) =>
+    set("access", req.access?.includes(n) ? req.access.filter((x) => x !== n) : [...(req.access ?? []), n]);
+
   const toggleInterest = (i: Interest) =>
     set("interests", req.interests.includes(i) ? req.interests.filter((x) => x !== i) : [...req.interests, i]);
 
@@ -139,7 +147,9 @@ export function Planner() {
       ...req,
       childAges,
       destinations,
-      ...(advanced ? {} : { mustSee: undefined, avoid: undefined, notes: undefined, totalBudget: undefined }),
+      ...(advanced ? {} : { mustSee: undefined, totalBudget: undefined }),
+      avoid: req.avoid?.trim() || undefined,
+      notes: req.notes?.trim() || undefined,
       useAI: aiReady && req.useAI,
     };
     const { trip, notice } = await planTrip(payload);
@@ -289,9 +299,34 @@ export function Planner() {
           <Segmented ariaLabel="Budget tier" value={req.budgetTier} onChange={(v) => set("budgetTier", v)} options={BUDGET_TIERS.map((b) => ({ value: b, label: `${BUDGET_META[b].symbol} ${BUDGET_META[b].label}`, hint: BUDGET_META[b].hint }))} />
         </Section>
 
+        <Section n={6} title="Anything to plan around?">
+          <div className="grid gap-4">
+            <div>
+              <p className="label">Getting around</p>
+              <div className="flex flex-wrap gap-2">
+                {ACCESS_NEEDS.map((n) => (
+                  <button key={n} type="button" className="chip" aria-pressed={req.access?.includes(n) ?? false} title={ACCESS_LABELS[n].hint} onClick={() => toggleAccess(n)}>
+                    {ACCESS_LABELS[n].label}
+                  </button>
+                ))}
+              </div>
+              {req.access?.length ? <p className="mt-1.5 text-xs text-muted">We leave out hikes, climbs and stops with lots of stairs. Lifts and step-free routes change, so check with each venue.</p> : null}
+            </div>
+            <div>
+              <label className="label" htmlFor="avoid">Skip</label>
+              <input id="avoid" className="field" placeholder="e.g. museums, early starts, nightlife" value={req.avoid ?? ""} onChange={(e) => set("avoid", e.target.value)} />
+            </div>
+            <div>
+              <label className="label" htmlFor="notes">Notes</label>
+              <textarea id="notes" rows={3} className="field resize-none" placeholder="Honeymoon, vegetarian, celebrating a birthday…" value={req.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
+              <p className="mt-1.5 text-xs text-muted">{aiReady && req.useAI ? "Giro AI reads your notes as it plans." : "Saved with your trip. Giro AI reads them when it's on; the instant planner uses Skip and the options above."}</p>
+            </div>
+          </div>
+        </Section>
+
         {advanced && (
           <>
-            <Section n={6} title="Pace & stay" icon={<SlidersHorizontal className="h-4 w-4" />}>
+            <Section n={7} title="Pace & stay" icon={<SlidersHorizontal className="h-4 w-4" />}>
               <Segmented ariaLabel="Pace" value={req.pace} onChange={(v) => set("pace", v)} options={PACES.map((p) => ({ value: p, label: PACE_META[p].label, hint: PACE_META[p].hint }))} />
               <p className="label mt-5">Where you like to stay</p>
               <div className="flex flex-wrap gap-2">
@@ -303,7 +338,7 @@ export function Planner() {
               </div>
             </Section>
 
-            <Section n={7} title="Fine-tune">
+            <Section n={8} title="Fine-tune">
               <div className="grid gap-4">
                 <div>
                   <label className="label" htmlFor="budget">Total budget for the group ({req.currency ?? DEFAULT_CURRENCY})</label>
@@ -315,15 +350,6 @@ export function Planner() {
                 <div>
                   <label className="label" htmlFor="must">Must-sees</label>
                   <input id="must" className="field" placeholder="Comma-separated, e.g. Sintra, a fado night" value={req.mustSee ?? ""} onChange={(e) => set("mustSee", e.target.value)} />
-                </div>
-                <div>
-                  <label className="label" htmlFor="avoid">Skip</label>
-                  <input id="avoid" className="field" placeholder="e.g. museums, early starts, nightlife" value={req.avoid ?? ""} onChange={(e) => set("avoid", e.target.value)} />
-                </div>
-                <div>
-                  <label className="label" htmlFor="notes">Anything else?</label>
-                  <textarea id="notes" rows={3} className="field resize-none" placeholder="Honeymoon, vegetarian, limited mobility, celebrating a birthday…" value={req.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
-                  <p className="mt-1.5 text-xs text-muted">Notes are used by Giro AI.</p>
                 </div>
               </div>
             </Section>

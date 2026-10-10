@@ -2,6 +2,7 @@ import { distanceKm, fareForDistance, findAirport } from "./airports.ts";
 import { DEFAULT_CURRENCY, fallbackFx, formatLocal, isCurrency, type FxSnapshot } from "./currency.ts";
 import { addDays, monthOf, nightsBetween } from "./dates.ts";
 import { DESTINATIONS, findDestination, type CatalogActivity, type Destination } from "./destinations.ts";
+import { accessPenalty, effortOf, isAccessNeed } from "./access.ts";
 import { childAges, describeParty, normalizeChildAges, partyMix } from "./party.ts";
 import { tasteBonus, type TasteProfile } from "./taste.ts";
 import type { Activity, BudgetBreakdown, BudgetTier, Day, Interest, Pace, Slot, Stay, StayType, Trip, TripRequest } from "./types.ts";
@@ -196,11 +197,13 @@ export interface ScoreContext {
 export function scoreActivity(act: CatalogActivity, index: number, ctx: ScoreContext): number {
   const { req } = ctx;
   if (matchesPhrase(act, ctx.avoid)) return -Infinity;
+  const access = accessPenalty(effortOf(act), req.access);
+  if (access === -Infinity) return -Infinity;
   const mix = req.children > 0 ? partyMix(req) : undefined;
   // Under-12s rule out very long days; any minor rules out bars and clubs.
   const youngKids = mix ? mix.infants + mix.kids > 0 : false;
   if (mix && ((youngKids && act.hrs >= 9) || (!act.kids && act.cats.includes("nightlife")))) return -Infinity;
-  let score = 1;
+  let score = 1 + access;
   const overlap = act.cats.filter((c) => req.interests.includes(c)).length;
   score += overlap * 3;
   if (req.interests.length === 0) score += 1;
@@ -522,6 +525,7 @@ export function normalizeRequest(input: TripRequest): TripRequest {
     adults: Math.min(16, Math.max(1, Math.round(input.adults || 1))),
     children,
     childAges: normalizeChildAges(children, input.childAges),
+    access: input.access?.length ? [...new Set(input.access.filter(isAccessNeed))] : undefined,
     interests: [...new Set(input.interests ?? [])],
     currency: isCurrency(input.currency) ? input.currency : DEFAULT_CURRENCY,
     totalBudget: input.totalBudget && input.totalBudget > 0 ? Math.round(input.totalBudget) : undefined,

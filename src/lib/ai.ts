@@ -4,6 +4,7 @@ import { z } from "zod";
 import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, resolveFx, tripTitle } from "./curate.ts";
 import { FOOD } from "../data/food.ts";
 import { findDestination } from "./destinations.ts";
+import { ACCESS_LABELS } from "./access.ts";
 import { agesKnown, describeParty } from "./party.ts";
 import type { Price } from "./food.ts";
 import type { FxSnapshot } from "./currency.ts";
@@ -112,6 +113,7 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
     `Preferred stay: ${req.stayType}`,
     req.mustSee ? `Must see / do: ${req.mustSee}` : "",
     req.avoid ? `Avoid: ${req.avoid}` : "",
+    req.access?.length ? `Access needs: ${req.access.map((n) => ACCESS_LABELS[n].hint).join("; ")}. Leave out stops that can't meet these, and say in the tip when a venue has a step-free route or lift.` : "",
     req.notes ? `Other notes from the traveller: ${req.notes}` : "",
     "",
     `Return exactly ${lines.length} days, in this order:`,

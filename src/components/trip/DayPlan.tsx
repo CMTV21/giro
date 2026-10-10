@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { BedDouble, Navigation, Plane, Plus, Printer, Shuffle, UtensilsCrossed, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { accessCaution, effortOf } from "@/lib/access";
 import { mapsRouteUrl } from "@/lib/booking";
 import { newId, suggestAlternatives } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
@@ -98,6 +99,7 @@ export function DayPlan({
                         fx={tripFx(trip)}
                         tripId={trip.id}
                         time={timed.get(a.id)}
+                        caution={accessCaution(effortOf({ key: a.ref ?? "", hrs: a.durationHrs }), trip.request.access)}
                         handle={handle}
                         extra={a.category !== "transit" && a.category !== "free" ? renderExtra?.(a, day.city) : undefined}
                         actions={{
