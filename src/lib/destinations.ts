@@ -658,6 +658,15 @@ export function normalizeCity(input: string): string {
     .trim();
 }
 
+/** A catalog stop by its key, with its city. */
+export function catalogStop(key: string): { title: string; city: string } | undefined {
+  for (const d of DESTINATIONS) {
+    const a = d.activities.find((x) => x.key === key);
+    if (a) return { title: a.title, city: d.name };
+  }
+  return undefined;
+}
+
 export function findDestination(input: string): Destination | undefined {
   const q = normalizeCity(input);
   if (!q) return undefined;

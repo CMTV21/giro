@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
+import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
@@ -22,6 +22,8 @@ export interface ActivityTime {
 export interface ActivityActions {
   onSwap?: () => void;
   onEdit?: () => void;
+  /** Catalog stops: take it out and never suggest it again. */
+  onBlock?: () => void;
   /** Takes the stop out of the plan and into Ideas, so nothing is lost. */
   onRemove: () => void;
   onToggleBooked: () => void;
@@ -181,6 +183,7 @@ export function ActivityCard({
               {actions.onEdit && <IconBtn label="Edit stop or add a note" onClick={actions.onEdit}><Pencil className="h-4 w-4" /></IconBtn>}
               {actions.onSwap && <IconBtn label="Swap for something else" onClick={actions.onSwap}><Shuffle className="h-4 w-4" /></IconBtn>}
               {!isTransit && <IconBtn label="Move to Ideas" onClick={actions.onRemove}><ArchiveRestore className="h-4 w-4" /></IconBtn>}
+              {actions.onBlock && <IconBtn label="Remove and never suggest this again" onClick={actions.onBlock}><Ban className="h-4 w-4" /></IconBtn>}
             </span>
           )}
         </div>

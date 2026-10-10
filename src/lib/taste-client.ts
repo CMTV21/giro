@@ -1,6 +1,6 @@
 "use client";
 
-import { applySignal, emptyTaste, parseTaste, type TasteProfile, type TasteSignal } from "./taste";
+import { applySignal, emptyTaste, parseTaste, withBlocked, type TasteProfile, type TasteSignal } from "./taste";
 import type { Activity } from "./types";
 
 const KEY = "giro.taste.v1";
@@ -25,6 +25,11 @@ export function saveTaste(profile: TasteProfile, { sync = true } = {}) {
     /* storage unavailable */
   }
   if (sync) scheduleSync(profile);
+}
+
+/** Never (or again) suggest a catalog stop. */
+export function setBlocked(key: string, blocked: boolean) {
+  saveTaste(withBlocked(loadTaste(), key, blocked));
 }
 
 /** Record what the traveller did; quietly synced to their account when signed in. */

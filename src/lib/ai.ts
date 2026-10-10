@@ -3,7 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { buildDays, estimateBudget, newId, normalizeRequest, packingList, planLegs, resolveFx, tripTitle } from "./curate.ts";
 import { FOOD } from "../data/food.ts";
-import { findDestination } from "./destinations.ts";
+import { catalogStop, findDestination } from "./destinations.ts";
 import { ACCESS_LABELS } from "./access.ts";
 import { agesKnown, describeParty } from "./party.ts";
 import type { Price } from "./food.ts";
@@ -76,6 +76,12 @@ export function aiAvailable(): boolean {
 
 export class AIRefusalError extends Error {}
 
+/** Stops the traveller asked never to see again, by name, for the cities in this trip. */
+function blockedFor(cities: string[], taste?: TasteProfile): string {
+  const names = (taste?.blocked ?? []).map(catalogStop).filter((s) => s && cities.includes(s.city)).map((s) => s!.title);
+  return names.length ? `Never include (the traveller blocked these): ${names.join("; ")}` : "";
+}
+
 function skeleton(req: TripRequest, taste?: TasteProfile) {
   const legs = planLegs(req);
   const days = buildDays(req, legs, taste);
@@ -115,6 +121,7 @@ export async function curateWithClaude(input: TripRequest, opts: AICurateOptions
     req.avoid ? `Avoid: ${req.avoid}` : "",
     req.access?.length ? `Access needs: ${req.access.map((n) => ACCESS_LABELS[n].hint).join("; ")}. Leave out stops that can't meet these, and say in the tip when a venue has a step-free route or lift.` : "",
     req.notes ? `Other notes from the traveller: ${req.notes}` : "",
+    blockedFor(legs.map((l) => l.city), opts.taste),
     "",
     `Return exactly ${lines.length} days, in this order:`,
     ...lines,

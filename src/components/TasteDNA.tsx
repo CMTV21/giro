@@ -1,8 +1,9 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Ban, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { emptyTaste, type TasteProfile } from "@/lib/taste";
+import { catalogStop } from "@/lib/destinations";
+import { emptyTaste, withBlocked, type TasteProfile } from "@/lib/taste";
 import { loadTaste, saveTaste } from "@/lib/taste-client";
 import { INTERESTS, type Interest } from "@/lib/types";
 import { INTEREST_META } from "./meta";
@@ -33,7 +34,7 @@ export function TasteDNA() {
           </p>
         </div>
         {taste.events > 0 && (
-          <button type="button" className="btn-ghost py-1.5 text-xs" onClick={() => { const fresh = emptyTaste(); saveTaste(fresh); setTaste(fresh); }}>
+          <button type="button" className="btn-ghost py-1.5 text-xs" onClick={() => { const fresh = { ...emptyTaste(), blocked: taste.blocked }; saveTaste(fresh); setTaste(fresh); }}>
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </button>
         )}
@@ -61,6 +62,23 @@ export function TasteDNA() {
         })}
       </ul>
       <p className="mt-4 text-xs text-muted">Giro uses this to break ties when curating and suggesting swaps. Your explicit choices in the planner always win.</p>
+      {(taste.blocked?.length ?? 0) > 0 && (
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Ban className="h-4 w-4" /> Hidden suggestions</h3>
+          <p className="mt-0.5 text-xs text-muted">Giro won&apos;t suggest these again in new plans, swaps or Ideas.</p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {taste.blocked!.map((key) => {
+              const stop = catalogStop(key);
+              return (
+                <li key={key} className="inline-flex items-center gap-1 rounded-full border border-line bg-surface py-1 pr-1 pl-3 text-sm">
+                  {stop ? `${stop.title} · ${stop.city}` : key}
+                  <button type="button" aria-label={`Suggest ${stop?.title ?? key} again`} title="Suggest again" onClick={() => { const next = withBlocked(taste, key, false); saveTaste(next); setTaste(next); }} className="grid h-6 w-6 place-items-center rounded-full text-muted hover:bg-sand hover:text-ink"><X className="h-3.5 w-3.5" /></button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

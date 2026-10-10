@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/dates";
 import { money, tripFx } from "@/lib/money";
 import { clock, dayWindow, scheduleDay, toMinutes, type ScheduledItem } from "@/lib/schedule";
 import type { VoteTally } from "@/lib/storage";
-import { loadTaste, recordSignal } from "@/lib/taste-client";
+import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Activity, Day, Slot, Trip } from "@/lib/types";
 import { applyStopEdit, customStop, draftFrom, emptyDraft, placeBySlot } from "@/lib/plan-edit";
 import { ActivityCard, DragHandle } from "./ActivityCard";
@@ -119,6 +119,13 @@ export function DayPlan({
                           onSetStart: (hhmm) => update(day.activities.map((x) => (x.id === a.id ? { ...x, start: hhmm } : x))),
                           onSwap: a.category === "transit" ? undefined : () => setSwapping(swapping === a.id ? undefined : a.id),
                           onEdit: () => setEditing(editing === a.id ? undefined : a.id),
+                          onBlock: a.ref && !a.ref.startsWith("food:") && a.category !== "transit"
+                            ? () => {
+                                setBlocked(a.ref!, true);
+                                recordSignal("removed", a.category);
+                                update(day.activities.filter((x) => x.id !== a.id));
+                              }
+                            : undefined,
                           readOnly,
                           votes: votes?.[a.id],
                           onVote: onVote

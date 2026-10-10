@@ -196,7 +196,7 @@ export interface ScoreContext {
 
 export function scoreActivity(act: CatalogActivity, index: number, ctx: ScoreContext): number {
   const { req } = ctx;
-  if (matchesPhrase(act, ctx.avoid)) return -Infinity;
+  if (matchesPhrase(act, ctx.avoid) || ctx.taste?.blocked?.includes(act.key)) return -Infinity;
   const access = accessPenalty(effortOf(act), req.access);
   if (access === -Infinity) return -Infinity;
   const mix = req.children > 0 ? partyMix(req) : undefined;

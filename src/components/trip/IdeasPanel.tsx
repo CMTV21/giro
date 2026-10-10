@@ -2,13 +2,13 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArchiveRestore, GripVertical, Lightbulb, Plus, Star, X } from "lucide-react";
+import { ArchiveRestore, Ban, GripVertical, Lightbulb, Plus, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { reviewsLink, trackedHref } from "@/lib/booking";
 import { formatDate } from "@/lib/dates";
 import { ideasFor, type Idea } from "@/lib/ideas";
 import { money, tripFx } from "@/lib/money";
-import { loadTaste } from "@/lib/taste-client";
+import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Interest, Trip } from "@/lib/types";
 import { CATEGORY_META, INTEREST_META } from "../meta";
 import { PlacePhoto } from "./PlacePhoto";
@@ -19,7 +19,15 @@ export function IdeasPanel({ trip, readOnly, onAdd, onDismiss }: { trip: Trip; r
   const cities = [...new Set(trip.days.map((d) => d.city))];
   const [city, setCity] = useState(cities[0]);
   const [filter, setFilter] = useState<Interest | "all">("all");
-  const ideas = useMemo(() => ideasFor(trip, city ?? cities[0], loadTaste()), [trip, city, cities]);
+  const [blocks, setBlocks] = useState(0);
+  const ideas = useMemo(() => ideasFor(trip, city ?? cities[0], loadTaste()), [trip, city, cities, blocks]); // eslint-disable-line react-hooks/exhaustive-deps
+  const block = (idea: Idea) => {
+    if (!idea.ref) return;
+    setBlocked(idea.ref, true);
+    recordSignal("removed", idea.category);
+    if (idea.origin === "parked") onDismiss(idea.id);
+    setBlocks((n) => n + 1);
+  };
   const shown = ideas.filter((i) => filter === "all" || i.categories.includes(filter)).slice(0, 30);
   const cats = [...new Set(ideas.flatMap((i) => i.categories))].slice(0, 8) as Interest[];
   const days = trip.days.filter((d) => d.city === city);
@@ -44,14 +52,14 @@ export function IdeasPanel({ trip, readOnly, onAdd, onDismiss }: { trip: Trip; r
         ))}
       </div>
       <ul className="mt-3 space-y-2">
-        {shown.map((idea) => <IdeaCard key={idea.id} idea={idea} trip={trip} days={days} readOnly={readOnly} onAdd={onAdd} onDismiss={onDismiss} />)}
+        {shown.map((idea) => <IdeaCard key={idea.id} idea={idea} trip={trip} days={days} readOnly={readOnly} onAdd={onAdd} onDismiss={onDismiss} onBlock={block} />)}
         {!shown.length && <li className="py-4 text-center text-sm text-muted">No ideas left for this filter.</li>}
       </ul>
     </section>
   );
 }
 
-function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss }: { idea: Idea; trip: Trip; days: Trip["days"]; readOnly: boolean; onAdd: (idea: Idea, dayIndex: number) => void; onDismiss: (id: string) => void }) {
+function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss, onBlock }: { idea: Idea; trip: Trip; days: Trip["days"]; readOnly: boolean; onAdd: (idea: Idea, dayIndex: number) => void; onDismiss: (id: string) => void; onBlock: (idea: Idea) => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: ideaDragId(idea.id), data: { type: "idea", idea }, disabled: readOnly });
   const meta = CATEGORY_META[idea.category] ?? CATEGORY_META.free;
   const Icon = meta.icon;
@@ -74,6 +82,9 @@ function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss }: { idea: Idea
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"><ArchiveRestore className="h-3 w-3" /> {idea.reason}</p>
           )}
         </div>
+        {idea.ref && !readOnly && (
+          <button type="button" aria-label={`Never suggest ${idea.title} again`} title="Never suggest this again" onClick={() => onBlock(idea)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-sand hover:text-ink"><Ban className="h-3.5 w-3.5" /></button>
+        )}
         {idea.origin === "parked" && !readOnly && (
           <button type="button" aria-label={`Discard ${idea.title}`} title="Discard" onClick={() => onDismiss(idea.id)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-sand hover:text-ink"><X className="h-3.5 w-3.5" /></button>
         )}
