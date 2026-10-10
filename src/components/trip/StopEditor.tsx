@@ -17,6 +17,7 @@ export function StopEditor({
   shared,
   onSave,
   onCancel,
+  compact,
 }: {
   initial: StopDraft;
   fx: Pick<FxSnapshot, "currency" | "rate">;
@@ -25,6 +26,8 @@ export function StopEditor({
   shared?: boolean;
   onSave: (fields: Omit<Activity, "id">) => void;
   onCancel: () => void;
+  /** Narrow layout for side panels (the board). */
+  compact?: boolean;
 }) {
   const [d, setD] = useState<StopDraft>(initial);
   const [error, setError] = useState<string>();
@@ -34,7 +37,7 @@ export function StopEditor({
 
   return (
     <form
-      className="mb-5 ml-14 grid gap-3 rounded-2xl border border-ink/10 bg-sand/60 p-4"
+      className={`grid gap-3 rounded-2xl border border-ink/10 bg-sand/60 p-4 ${compact ? "" : "mb-5 ml-14"}`}
       onKeyDown={(e) => e.key === "Escape" && onCancel()}
       onSubmit={(e) => {
         e.preventDefault();
@@ -44,11 +47,11 @@ export function StopEditor({
       }}
     >
       <p className="text-sm font-semibold">{mode === "add" ? "Add your own stop" : "Edit stop"}</p>
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+      <div className={`grid gap-3 ${compact ? "" : "sm:grid-cols-[2fr_1fr]"}`}>
         <input autoFocus className="field py-2" placeholder="What do you want to do?" aria-label="Stop name" value={d.title} onChange={(e) => set("title", e.target.value)} maxLength={160} />
         <input className="field py-2" placeholder="Area or address (optional)" aria-label="Area" value={d.area} onChange={(e) => set("area", e.target.value)} maxLength={120} />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 ${compact ? "" : "sm:grid-cols-4"}`}>
         <label className="text-xs font-medium text-muted">
           Type
           <select className="field mt-1 py-2" value={d.category} onChange={(e) => set("category", e.target.value as Activity["category"])} disabled={d.category === "transit"}>
@@ -81,7 +84,7 @@ export function StopEditor({
         </div>
       </div>
       <p id="start-hint" className="-mt-1 text-xs text-muted">Leave the start time empty and Giro fits it into the day. Changing how long it takes re-times everything after it.</p>
-      <label className="text-xs font-medium text-muted sm:max-w-48">
+      <label className={`text-xs font-medium text-muted ${compact ? "" : "sm:max-w-48"}`}>
         Cost per adult ({fx.currency})
         <div className="relative mt-1">
           <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">{currencySymbol(fx.currency)}</span>

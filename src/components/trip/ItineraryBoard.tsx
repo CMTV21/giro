@@ -12,22 +12,26 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { CalendarClock, LayoutList } from "lucide-react";
+import { CalendarRange, LayoutList } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BOARD_FROM, BOARD_TO, minutesAt, placeAtTime, type BoardSource } from "@/lib/board";
 import { recalcBudget } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
+import { clock } from "@/lib/schedule";
 import type { Idea } from "@/lib/ideas";
-import { dismissIdea, insertIdea, moveStop, parkActivity, setStart } from "@/lib/plan-edit";
+import { dismissIdea, insertIdea, moveStop, parkActivity } from "@/lib/plan-edit";
 import type { VoteTally } from "@/lib/storage";
 import { recordSignal } from "@/lib/taste-client";
 import type { Day, Trip } from "@/lib/types";
 import { DayPlan, type DayGroupProps } from "./DayPlan";
 import { IdeasPanel } from "./IdeasPanel";
-import { TimelineView } from "./TimelineView";
+import { BOARD_PX, BoardView, type BoardPreview } from "./BoardView";
 
+// "timeline" is the board's stored name from before it became editable; kept so saved choices still apply.
 type View = "list" | "timeline";
 const VIEW_KEY = "giro.itineraryView";
 
@@ -56,6 +60,7 @@ export function ItineraryBoard({
 } & Pick<DayGroupProps, "renderExtra" | "renderMap">) {
   const [view, setView] = useState<View>("list");
   const [dragging, setDragging] = useState<string>();
+  const [preview, setPreview] = useState<BoardPreview>();
 
   useEffect(() => {
     try {
@@ -85,11 +90,43 @@ export function ItineraryBoard({
 
   function onDragStart(e: DragStartEvent) {
     const data = e.active.data.current as { type: string; idea?: Idea } | undefined;
-    setDragging(data?.type === "idea" ? data.idea!.title : trip.days.flatMap((d) => d.activities).find((a) => a.id === e.active.id)?.title);
+    const boardData = e.active.data.current as { title?: string } | undefined;
+    setDragging(data?.type === "idea" ? data.idea!.title : data?.type === "board-stop" ? boardData?.title : trip.days.flatMap((d) => d.activities).find((a) => a.id === e.active.id)?.title);
+  }
+
+  /** Board drops: where the dragged block's top edge sits is its new start time. */
+  function boardTarget(e: DragMoveEvent | DragEndEvent): { source: BoardSource; preview: BoardPreview } | undefined {
+    const { active, over } = e;
+    const overData = over?.data.current as { type?: string; dayIndex?: number } | undefined;
+    const top = active.rect.current.translated?.top;
+    if (!over || overData?.type !== "board-day" || overData.dayIndex === undefined || top === undefined) return undefined;
+    const data = active.data.current as { type: string; idea?: Idea; dayIndex?: number; activityId?: string; lengthMins?: number } | undefined;
+    const source: BoardSource | undefined =
+      data?.type === "idea" ? { kind: "idea", idea: data.idea! } : data?.type === "board-stop" ? { kind: "stop", dayIndex: data.dayIndex!, activityId: data.activityId! } : undefined;
+    if (!source) return undefined;
+    const lengthMins = data?.type === "idea" ? Math.round(data.idea!.durationHrs * 60) : data?.lengthMins ?? 60;
+    const minutes = Math.max(BOARD_FROM, Math.min(BOARD_TO - lengthMins, minutesAt(top - over.rect.top, BOARD_PX)));
+    const day = trip.days[overData.dayIndex];
+    const fromCity = source.kind === "idea" ? source.idea.city : trip.days[source.dayIndex]?.city;
+    return { source, preview: { dayIndex: overData.dayIndex, minutes, lengthMins, blocked: fromCity && day && fromCity !== day.city ? `Day ${day.index + 1} is in ${day.city}` : undefined } };
+  }
+
+  function onDragMove(e: DragMoveEvent) {
+    if (view !== "timeline") return;
+    const next = boardTarget(e)?.preview;
+    setPreview((p) => (p?.dayIndex === next?.dayIndex && p?.minutes === next?.minutes && p?.blocked === next?.blocked ? p : next));
   }
 
   function onDragEnd(e: DragEndEvent) {
     setDragging(undefined);
+    setPreview(undefined);
+    const board = boardTarget(e);
+    if (board) {
+      const r = placeAtTime(trip, board.source, board.preview.dayIndex, board.preview.minutes);
+      if (r.error) return onMessage(r.error);
+      if (board.source.kind === "idea") recordSignal("added", board.source.idea.category);
+      return commit(r.trip);
+    }
     const { active, over } = e;
     if (!over) return;
     const overData = over.data.current as { type?: string; dayIndex?: number } | undefined;
@@ -113,7 +150,7 @@ export function ItineraryBoard({
   const groupProps = { votes, onVote, readOnly, renderExtra, renderMap };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(undefined)}>
+    <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => { setDragging(undefined); setPreview(undefined); }}>
       <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Jump to day" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1">
           {trip.days.map((d) => (
@@ -124,12 +161,12 @@ export function ItineraryBoard({
         </nav>
         <div role="tablist" aria-label="Itinerary view" className="inline-flex rounded-full border border-line bg-surface p-1">
           <button role="tab" aria-selected={view === "list"} onClick={() => choose("list")} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${view === "list" ? "bg-ink text-white" : "text-ink-soft"}`}><LayoutList className="h-3.5 w-3.5" /> List</button>
-          <button role="tab" aria-selected={view === "timeline"} onClick={() => choose("timeline")} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${view === "timeline" ? "bg-ink text-white" : "text-ink-soft"}`}><CalendarClock className="h-3.5 w-3.5" /> Timeline</button>
+          <button role="tab" aria-selected={view === "timeline"} onClick={() => choose("timeline")} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${view === "timeline" ? "bg-ink text-white" : "text-ink-soft"}`}><CalendarRange className="h-3.5 w-3.5" /> Board</button>
         </div>
       </div>
 
       {view === "timeline" ? (
-        <TimelineView trip={trip} readOnly={readOnly} onSetStart={(di, id, hhmm) => commit(setStart(trip, di, id, hhmm))} />
+        <BoardView trip={trip} readOnly={readOnly} preview={preview} onChange={commit} onMessage={onMessage} />
       ) : (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-12">
@@ -162,7 +199,12 @@ export function ItineraryBoard({
       )}
 
       <DragOverlay dropAnimation={null}>
-        {dragging && <div className="rounded-xl border border-ink/20 bg-surface px-4 py-2 text-sm font-semibold shadow-lift">{dragging}</div>}
+        {dragging && (
+          <div className="rounded-xl border border-ink/20 bg-surface px-4 py-2 text-sm font-semibold shadow-lift">
+            {dragging}
+            {preview && <span className="block text-xs font-medium text-muted">{preview.blocked ?? `Day ${preview.dayIndex + 1} · ${clock(preview.minutes)}`}</span>}
+          </div>
+        )}
       </DragOverlay>
     </DndContext>
   );

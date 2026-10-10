@@ -139,7 +139,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
             ) : (
               <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line px-4 py-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sea-soft text-sea"><BedDouble className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-48">
                   <p className="text-xs font-semibold tracking-wide text-muted uppercase">{s.city} · {formatDate(s.checkIn, { month: "short", day: "numeric" })} – {formatDate(s.checkOut, { month: "short", day: "numeric" })}</p>
                   {s.booking ? (
                     <>

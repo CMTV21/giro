@@ -15,7 +15,8 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Giro AI**: Claude researches any destination and hand-picks real places |
 | | **Partner revenue dashboard**: clicks, trip value and projected commission |
 | | **Flights & stays**: add booked flights and hotels (or import from a confirmation photo/PDF); days re-time around landings and departures |
-| | **Real clock times**: travel buffers, lunch and dinner, pinned start times, and an hour-by-hour timeline view |
+| | **Real clock times**: travel buffers, lunch and dinner, pinned start times |
+| | **Board**: every day side by side on one clock. Drag stops between days and times, stretch to change length, tap to edit, book or move to Ideas, tap an empty spot to add; travel time shows between stops |
 | | **Ideas**: drag attractions into any day; removed or displaced stops wait here instead of disappearing |
 | | **History & facts** for each stop (Wikipedia, attributed), **day maps**, and a **printable sightseeing guide** |
 | | **Receipts** on shared expenses, read by Claude to fill in the amount and currency |
