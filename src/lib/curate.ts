@@ -579,6 +579,26 @@ export function curateTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
   };
 }
 
+/**
+ * A trip with the structure but none of the picks: dates, cities, travel days, stays, packing and
+ * food guide, with empty days to fill from Ideas, the food guide or your own stops.
+ */
+export function blankTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
+  const t = curateTrip({ ...input, useAI: false }, opts);
+  const days = t.days.map((d) => {
+    const activities = d.activities.filter((a) => a.category === "transit");
+    const travel = /^(Arrive|On to|Farewell)/.test(d.theme);
+    return { ...d, activities, theme: travel ? d.theme : `Your day in ${d.city}`, eat: undefined };
+  });
+  const legs = planLegs(t.request);
+  return {
+    ...t,
+    days,
+    summary: `A blank canvas for ${days.length} days: drag in Ideas, add restaurants from Eat & drink, or add your own stops.`,
+    budget: estimateBudget(t.request, legs, days),
+  };
+}
+
 /** Recompute derived totals after the traveller edits the itinerary. */
 export function recalcBudget(trip: Trip): Trip {
   const legs = planLegs(trip.request);

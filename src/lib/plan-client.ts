@@ -1,6 +1,6 @@
 "use client";
 
-import { curateTrip } from "./curate";
+import { blankTrip, curateTrip } from "./curate";
 import { DEFAULT_CURRENCY, FALLBACK_AS_OF, FALLBACK_RATES, type Currency, type FxSnapshot } from "./currency";
 import { saveTrip } from "./storage";
 import { loadTaste } from "./taste-client";
@@ -51,4 +51,10 @@ export async function planTrip(req: TripRequest): Promise<{ trip: Trip; notice: 
   }
   const trip = curateTrip({ ...req, useAI: false }, { fx, taste });
   return { trip: await saveTrip(trip), notice };
+}
+
+/** Start from scratch: the trip's structure with empty days to fill yourself. */
+export async function planBlank(req: TripRequest): Promise<Trip> {
+  const fx = await getFx(req.currency);
+  return saveTrip(blankTrip(req, { fx }));
 }

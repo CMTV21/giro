@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowRight, CalendarDays, LoaderCircle, MapPin, Plane, Plus, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { ArrowRight, CalendarDays, LoaderCircle, MapPin, PencilRuler, Plane, Plus, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, formatRange, isValidISODate, nightsBetween, toISODate } from "@/lib/dates";
 import { CURRENCIES, CURRENCY_NAMES, DEFAULT_CURRENCY, currencySymbol, isCurrency } from "@/lib/currency";
 import { DESTINATIONS, findDestination } from "@/lib/destinations";
-import { checkAI, planTrip } from "@/lib/plan-client";
+import { checkAI, planBlank, planTrip } from "@/lib/plan-client";
 import { ACCESS_LABELS, ACCESS_NEEDS, isAccessNeed, type AccessNeed } from "@/lib/access";
 import { ageLabel, describeParty, MAX_CHILD_AGE, normalizeChildAges } from "@/lib/party";
 import { topInterests } from "@/lib/taste";
@@ -133,6 +133,14 @@ export function Planner() {
 
   const toggleInterest = (i: Interest) =>
     set("interests", req.interests.includes(i) ? req.interests.filter((x) => x !== i) : [...req.interests, i]);
+
+  async function startBlank() {
+    if (problem) return setError(problem);
+    setError(undefined);
+    setBusy(true);
+    const trip = await planBlank({ ...req, childAges, destinations: advanced ? cities : cities.slice(0, 1), useAI: false, mustSee: advanced ? req.mustSee : undefined, totalBudget: advanced ? req.totalBudget : undefined });
+    router.push(`/trip/${trip.id}`);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -391,6 +399,10 @@ export function Planner() {
               Curate my trip
               <ArrowRight className="h-4 w-4" />
             </button>
+            <button type="button" className="btn-ghost mt-2 w-full py-2.5 text-sm" disabled={busy} onClick={startBlank}>
+              <PencilRuler className="h-4 w-4" /> Start from scratch
+            </button>
+            <p className="mt-1.5 text-center text-xs text-muted">Empty days with your dates, cities and travel days. Fill them from Ideas or your own stops.</p>
           </div>
         </div>
       </aside>

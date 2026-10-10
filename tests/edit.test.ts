@@ -85,3 +85,17 @@ test("saved trips accept notes and own stops", () => {
   const tooLong = { ...edited, days: edited.days.map((d, i) => (i === 1 ? { ...d, activities: d.activities.map((x) => ({ ...x, note: "x".repeat(501) })) } : d)) };
   assert.ok(!TripSchema.safeParse(tooLong).success, "notes are size-capped");
 });
+
+test("a blank trip keeps the structure and travel days but no picks", async () => {
+  const { blankTrip } = await import("../src/lib/curate.ts");
+  const { ideasFor } = await import("../src/lib/ideas.ts");
+  const trip = blankTrip({ ...req, destinations: ["Lisbon", "Porto"], endDate: "2026-05-16" });
+  assert.equal(trip.days.length, 7);
+  assert.ok(trip.days.every((d) => d.activities.every((a) => a.category === "transit")));
+  assert.equal(trip.days[0].activities[0].category, "transit", "arrival kept");
+  assert.equal(trip.days.at(-1)!.activities.at(-1)!.category, "transit", "departure kept");
+  assert.equal(trip.budget.activities, 0);
+  assert.ok(trip.budget.lodging > 0 && trip.stays.length === 2 && trip.packing.length > 0);
+  assert.ok(ideasFor(trip, "Lisbon").filter((i) => i.origin === "catalog").length >= 10, "Ideas has the whole catalog to drag in");
+  assert.ok(TripSchema.safeParse(trip).success);
+});
