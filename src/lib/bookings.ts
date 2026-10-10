@@ -1,7 +1,7 @@
 import { airportCode } from "./booking.ts";
 import { newId } from "./curate.ts";
 import { normalizeCity } from "./destinations.ts";
-import type { Flight, StayBooking, Trip } from "./types.ts";
+import type { Flight, Paid, StayBooking, Trip } from "./types.ts";
 
 const valid = (date: string, time: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{1,2}:\d{2}$/.test(time);
 
@@ -42,6 +42,10 @@ export interface ExtractedStay {
   checkInTime: string;
   checkOutTime: string;
   confirmation: string;
+  total?: number;
+  currency?: string;
+  /** Set on import once the total has been converted. */
+  paid?: Paid;
 }
 
 export function toFlights(trip: Pick<Trip, "request">, found: ExtractedFlight[]): Flight[] {
@@ -75,6 +79,7 @@ export function applyStays(trip: Trip, found: ExtractedStay[]): { trip: Trip; ma
       checkInTime: /^\d{1,2}:\d{2}$/.test(hit.checkInTime) ? hit.checkInTime.padStart(5, "0") : undefined,
       checkOutTime: /^\d{1,2}:\d{2}$/.test(hit.checkOutTime) ? hit.checkOutTime.padStart(5, "0") : undefined,
       confirmation: hit.confirmation || undefined,
+      paid: hit.paid,
     };
     return { ...s, booking };
   });

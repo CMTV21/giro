@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ACCESS_NEEDS } from "./access.ts";
-import { CURRENCIES } from "./currency.ts";
+import { CURRENCIES, PAY_CURRENCIES } from "./currency.ts";
 import { BUDGET_TIERS, INTERESTS, PACES, STAY_TYPES, type Trip } from "./types.ts";
 
 /**
@@ -34,6 +34,8 @@ const ActivitySchema = z.object({
 
 const time = z.string().regex(/^\d{1,2}:\d{2}$/);
 
+const PaidSchema = z.object({ amount: z.number().min(0).max(100_000_000), currency: z.enum(PAY_CURRENCIES), usd: usd });
+
 const FlightSchema = z.object({
   id: str(40),
   kind: z.enum(["outbound", "return", "between"]),
@@ -46,6 +48,7 @@ const FlightSchema = z.object({
   arriveDate: date,
   arriveTime: time,
   confirmation: str(40).optional(),
+  paid: PaidSchema.optional(),
 });
 
 const StayBookingSchema = z.object({
@@ -57,6 +60,7 @@ const StayBookingSchema = z.object({
   url: z.string().url().max(500).refine((u) => /^https?:\/\//i.test(u), "Links must start with http(s)://").optional(),
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
+  paid: PaidSchema.optional(),
 });
 
 const RequestSchema = z.object({
@@ -104,7 +108,7 @@ export const TripSchema = z.object({
   stays: z
     .array(z.object({ city: str(80), checkIn: date, checkOut: date, nights: z.number().int().min(0).max(31), area: str(160), why: str(400), booking: StayBookingSchema.optional() }))
     .max(6),
-  budget: z.object({ flights: usd, lodging: usd, food: usd, activities: usd, localTransport: usd, total: usd, perPerson: usd }),
+  budget: z.object({ flights: usd, lodging: usd, food: usd, activities: usd, localTransport: usd, total: usd, perPerson: usd, booked: z.object({ flights: usd.optional(), lodging: usd.optional() }).optional() }),
   fx: z.object({ currency: z.enum(CURRENCIES), rate: z.number().positive().max(100_000), asOf: str(20), source: z.enum(["live", "fallback"]) }).optional(),
   packing: z.array(str(200)).max(60),
   tips: z.array(str(400)).max(30),

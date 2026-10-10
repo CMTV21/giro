@@ -1,4 +1,4 @@
-import { curateTrip, estimateBudget, freeTime, normalizeRequest, phrases, planLegs, resolveDestination, scoreActivity, toActivity, tripTitle } from "./curate.ts";
+import { curateTrip, estimateBudget, withBookedCosts, freeTime, normalizeRequest, phrases, planLegs, resolveDestination, scoreActivity, toActivity, tripTitle } from "./curate.ts";
 import { addDays, nightsBetween } from "./dates.ts";
 import type { TasteProfile } from "./taste.ts";
 import type { Activity, Day, ParkedIdea, Slot, Trip, TripRequest } from "./types.ts";
@@ -157,5 +157,5 @@ export function rescheduleTrip(trip: Trip, start: string, end: string, taste?: T
     stays,
     parked: [...(trip.parked ?? []), ...parked],
   };
-  return { trip: { ...next, budget: estimateBudget(req, legs, days) }, parked, addedDays, warnings };
+  return { trip: { ...next, budget: withBookedCosts(estimateBudget(req, legs, days), next, legs) }, parked, addedDays, warnings };
 }

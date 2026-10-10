@@ -411,6 +411,57 @@ export function returnFareUSD(origin: string, legs: Leg[]): number {
   return first.flightEst;
 }
 
+function roomsFor(req: TripRequest): number {
+  const adults = Math.max(1, req.adults);
+  const people = adults + Math.max(0, req.children);
+  return req.stayType === "apartment" || req.stayType === "resort" ? Math.max(1, Math.ceil(people / 4)) : Math.max(1, Math.ceil(adults / 2));
+}
+
+/** Estimated lodging for each leg (USD), in leg order (matches `trip.stays`). */
+export function lodgingByLeg(req: TripRequest, legs: Leg[]): number[] {
+  const rooms = roomsFor(req);
+  return legs.map((l) => l.nights * l.destination.daily[req.budgetTier].lodging * rooms * STAY_MULTIPLIER[req.stayType]);
+}
+
+/**
+ * Swap estimates for what the traveller actually paid: booked flights replace the flight estimate;
+ * each paid stay replaces its own leg's lodging estimate, other legs stay estimated.
+ */
+export function withBookedCosts(est: BudgetBreakdown, trip: Pick<Trip, "flights" | "stays" | "request">, legs: Leg[]): BudgetBreakdown {
+  const paidFlights = (trip.flights ?? []).filter((f) => f.paid);
+  const flightsPaid = round2(paidFlights.reduce((s, f) => s + f.paid!.usd, 0));
+  const perLeg = lodgingByLeg(trip.request, legs);
+  let lodgingPaid = 0;
+  let estimatedLegs = 0;
+  let anyStayPaid = false;
+  perLeg.forEach((estimate, i) => {
+    const paid = trip.stays[i]?.booking?.paid;
+    if (paid) {
+      anyStayPaid = true;
+      lodgingPaid += paid.usd;
+    } else estimatedLegs += estimate;
+  });
+  lodgingPaid = round2(lodgingPaid);
+  const flights = paidFlights.length ? flightsPaid : est.flights;
+  const lodging = anyStayPaid ? round2(lodgingPaid + round10(estimatedLegs)) : est.lodging;
+  if (!paidFlights.length && !anyStayPaid) {
+    const { booked: _drop, ...rest } = est;
+    return rest;
+  }
+  const total = round2(flights + lodging + est.food + est.activities + est.localTransport);
+  const people = Math.max(1, trip.request.adults) + Math.max(0, trip.request.children);
+  return {
+    ...est,
+    flights,
+    lodging,
+    total,
+    perPerson: round10(total / people),
+    booked: { ...(paidFlights.length ? { flights: flightsPaid } : {}), ...(anyStayPaid ? { lodging: lodgingPaid } : {}) },
+  };
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): BudgetBreakdown {
   const tier = req.budgetTier;
   const adults = Math.max(1, req.adults);
@@ -418,10 +469,9 @@ export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): Budg
   const people = adults + ages.length;
   // Each child as a fraction of an adult. The default age (8) gives the long-standing flat shares.
   const share = (f: (age: number) => number) => adults + ages.reduce((s, a) => s + f(a), 0);
-  const rooms = req.stayType === "apartment" || req.stayType === "resort" ? Math.max(1, Math.ceil(people / 4)) : Math.max(1, Math.ceil(adults / 2));
   const legOf = (city: string) => legs.find((l) => l.city === city) ?? legs[0];
 
-  const lodging = legs.reduce((s, l) => s + l.nights * l.destination.daily[tier].lodging * rooms * STAY_MULTIPLIER[req.stayType], 0);
+  const lodging = lodgingByLeg(req, legs).reduce((s, v) => s + v, 0);
   const food = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].food * share((a) => (a < 2 ? 0.2 : a <= 12 ? 0.6 : 0.9)), 0);
   const transfers = Math.max(0, legs.length - 1) * 80 * people;
   const localTransport = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].transport * share((a) => (a < 4 ? 0 : a <= 12 ? 0.5 : 0.8)), 0) + transfers;
@@ -602,7 +652,7 @@ export function blankTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
 /** Recompute derived totals after the traveller edits the itinerary. */
 export function recalcBudget(trip: Trip): Trip {
   const legs = planLegs(trip.request);
-  return { ...trip, budget: estimateBudget(trip.request, legs, trip.days) };
+  return { ...trip, budget: withBookedCosts(estimateBudget(trip.request, legs, trip.days), trip, legs) };
 }
 
 /** Catalog alternatives for a slot, excluding anything already in the trip. */

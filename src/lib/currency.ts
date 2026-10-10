@@ -6,6 +6,24 @@
 export const CURRENCIES = ["CAD", "USD", "EUR", "GBP", "AUD", "NZD", "MXN", "JPY", "CHF", "INR"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
+/** Currencies a booking can be paid in: the display currencies plus other ECB-quoted ones travellers often pay locally. */
+export const PAY_CURRENCIES = [...CURRENCIES, "CZK", "THB", "TRY", "KRW", "SGD", "ZAR", "ISK", "DKK", "SEK", "NOK", "PLN", "HUF", "HKD", "IDR", "CNY", "BRL"] as const;
+export type PayCurrency = (typeof PAY_CURRENCIES)[number];
+export const isPayCurrency = (v: unknown): v is PayCurrency => typeof v === "string" && (PAY_CURRENCIES as readonly string[]).includes(v);
+
+/** Live rates (units per USD) for payment-only currencies, from the same ECB feed. */
+export function parseExtraRates(json: unknown): Partial<Record<PayCurrency, number>> {
+  const rates = (json as { rates?: Record<string, unknown> } | undefined)?.rates;
+  const out: Partial<Record<PayCurrency, number>> = {};
+  if (!rates || typeof rates !== "object") return out;
+  for (const c of PAY_CURRENCIES) {
+    if ((CURRENCIES as readonly string[]).includes(c)) continue;
+    const v = rates[c];
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) out[c] = v;
+  }
+  return out;
+}
+
 export const DEFAULT_CURRENCY: Currency = "CAD";
 
 export const CURRENCY_NAMES: Record<Currency, string> = {

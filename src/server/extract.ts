@@ -30,9 +30,16 @@ const StayOut = z.object({
   checkInTime: z.string().describe("24-hour HH:MM, or empty string"),
   checkOutTime: z.string().describe("24-hour HH:MM, or empty string"),
   confirmation: z.string().describe("Booking reference, or empty string"),
+  total: z.number().describe("Total price paid for this stay including taxes and fees, exactly as shown; 0 if not shown"),
+  currency: z.string().describe("ISO 4217 code of that total, e.g. EUR; empty string if not shown"),
 });
 
-const BookingOut = z.object({ flights: z.array(FlightOut), stays: z.array(StayOut) });
+const BookingOut = z.object({
+  flights: z.array(FlightOut),
+  stays: z.array(StayOut),
+  flightsTotal: z.number().describe("Total price paid for all flights in this booking, for all passengers, including taxes; 0 if not shown"),
+  flightsCurrency: z.string().describe("ISO 4217 code of the flights total; empty string if not shown"),
+});
 
 const ReceiptOut = z.object({
   merchant: z.string().describe("Business name, or empty string"),
@@ -78,7 +85,7 @@ async function extract<T extends z.ZodType>(schema: T, instruction: string, mime
 export function readBooking(mime: SafeMime, bytes: Uint8Array, client = new Anthropic()): Promise<ExtractedBooking> {
   return extract(
     BookingOut,
-    "This is a travel booking confirmation (flight, hotel or rental). Extract every flight segment and every accommodation exactly as written. Use local times in 24-hour format. Leave a field empty rather than guessing. If it contains neither, return empty lists.",
+    "This is a travel booking confirmation (flight, hotel or rental). Extract every flight segment and every accommodation exactly as written. Use local times in 24-hour format. Include the total price paid only when it is stated (the grand total, not a per-night or per-person rate unless that's all there is). Leave a field empty or 0 rather than guessing. If it contains neither, return empty lists.",
     mime,
     bytes,
     client,

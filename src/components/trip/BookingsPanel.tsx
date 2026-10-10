@@ -4,10 +4,12 @@ import { BedDouble, FileUp, LoaderCircle, Pencil, Plane, Plus, Sparkles, Trash2,
 import { useEffect, useState } from "react";
 import { applyStays, draftFlight, toFlights, type ExtractedFlight, type ExtractedStay } from "@/lib/bookings";
 import { formatDate } from "@/lib/dates";
-import { checkAI } from "@/lib/plan-client";
+import { isPayCurrency, PAY_CURRENCIES, type PayCurrency } from "@/lib/currency";
+import { tripFx } from "@/lib/money";
+import { checkAI, paidToUsd } from "@/lib/plan-client";
 import { clock, fitToFlights, toMinutes } from "@/lib/schedule";
 import { ApiError } from "@/lib/storage";
-import type { Flight, StayBooking, Trip } from "@/lib/types";
+import type { Flight, Paid, StayBooking, Trip } from "@/lib/types";
 
 const KIND_LABEL: Record<Flight["kind"], string> = { outbound: "Flight out", return: "Flight home", between: "Between cities" };
 
@@ -55,12 +57,16 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
       const body = new FormData();
       body.set("file", await shrinkImage(file));
       const res = await fetch("/api/extract/booking", { method: "POST", body });
-      const json = (await res.json().catch(() => ({}))) as { flights?: ExtractedFlight[]; stays?: ExtractedStay[]; message?: string };
+      const json = (await res.json().catch(() => ({}))) as { flights?: ExtractedFlight[]; stays?: ExtractedStay[]; flightsTotal?: number; flightsCurrency?: string; message?: string };
       if (!res.ok) throw new ApiError(res.status, "error", json.message ?? "We couldn't read that file.");
       const found = toFlights(trip, json.flights ?? []);
       const known = new Set((trip.flights ?? []).map((f) => `${f.flightNumber}|${f.departDate}`));
       const fresh = found.filter((f) => !f.flightNumber || !known.has(`${f.flightNumber}|${f.departDate}`));
-      const { trip: withStay, matched } = applyStays(trip, json.stays ?? []);
+      // Totals on the confirmation become what you paid (the whole flight booking goes on its first flight).
+      const flightsPaid = await importedPaid(json.flightsTotal, json.flightsCurrency);
+      if (flightsPaid && fresh[0]) fresh[0] = { ...fresh[0], paid: flightsPaid };
+      const stays = await Promise.all((json.stays ?? []).map(async (s) => ({ ...s, paid: await importedPaid(s.total, s.currency) })));
+      const { trip: withStay, matched } = applyStays(trip, stays);
       if (!fresh.length && !matched) {
         setError("We didn't find any flights or stays in that document. Add them by hand below.");
         return;
@@ -93,7 +99,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
       <ul className="mt-4 space-y-2">
         {flights.map((f) =>
           editing?.id === f.id ? (
-            <li key={f.id}><FlightForm value={editing} onCancel={() => setEditing(undefined)} onSave={saveFlight} /></li>
+            <li key={f.id}><FlightForm value={editing} currency={tripFx(trip).currency} onCancel={() => setEditing(undefined)} onSave={saveFlight} /></li>
           ) : (
             <li key={f.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line px-4 py-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sky-50 text-sky-700"><Plane className="h-4 w-4" /></span>
@@ -104,6 +110,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
                   {formatDate(f.departDate)}, {clock(toMinutes(f.departTime) ?? 0)} → {f.arriveDate !== f.departDate ? `${formatDate(f.arriveDate)}, ` : ""}{clock(toMinutes(f.arriveTime) ?? 0)}
                   {f.confirmation && <span className="text-muted"> · Ref {f.confirmation}</span>}
                 </p>
+                {f.paid && <p className="text-sm font-medium text-sea">Paid {formatPaid(f.paid)}</p>}
               </div>
               {!readOnly && (
                 <span className="flex gap-1">
@@ -114,7 +121,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
             </li>
           ),
         )}
-        {editing && !flights.some((f) => f.id === editing.id) && <li><FlightForm value={editing} onCancel={() => setEditing(undefined)} onSave={saveFlight} /></li>}
+        {editing && !flights.some((f) => f.id === editing.id) && <li><FlightForm value={editing} currency={tripFx(trip).currency} onCancel={() => setEditing(undefined)} onSave={saveFlight} /></li>}
       </ul>
       {!readOnly && !editing && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -128,7 +135,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
         {trip.stays.map((s, i) => (
           <li key={s.city + s.checkIn}>
             {stayEdit === i ? (
-              <StayForm stay={s.booking} onCancel={() => setStayEdit(undefined)} onSave={(b) => saveStay(i, b)} />
+              <StayForm stay={s.booking} currency={tripFx(trip).currency} onCancel={() => setStayEdit(undefined)} onSave={(b) => saveStay(i, b)} />
             ) : (
               <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line px-4 py-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sea-soft text-sea"><BedDouble className="h-4 w-4" /></span>
@@ -142,6 +149,7 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
                         {(s.booking.checkInTime || s.booking.checkOutTime) && <span className="text-muted">{s.booking.address ? " · " : ""}Check-in {s.booking.checkInTime ? clock(toMinutes(s.booking.checkInTime)!) : "—"}, check-out {s.booking.checkOutTime ? clock(toMinutes(s.booking.checkOutTime)!) : "—"}</span>}
                         {s.booking.confirmation && <span className="text-muted"> · Ref {s.booking.confirmation}</span>}
                       </p>
+                      {s.booking.paid && <p className="text-sm font-medium text-sea">Paid {formatPaid(s.booking.paid)}</p>}
                     </>
                   ) : (
                     <p className="text-sm text-muted">Suggested area: {s.area}</p>
@@ -162,18 +170,21 @@ export function BookingsPanel({ trip, readOnly, onChange }: { trip: Trip; readOn
   );
 }
 
-function FlightForm({ value, onSave, onCancel }: { value: Flight; onSave: (f: Flight) => void; onCancel: () => void }) {
+function FlightForm({ value, currency, onSave, onCancel }: { value: Flight; currency: PayCurrency; onSave: (f: Flight) => void; onCancel: () => void }) {
   const [f, setF] = useState<Flight>(value);
   const [error, setError] = useState<string>();
+  const [price, setPrice] = useState(priceDraft(value.paid, currency));
   const set = (k: keyof Flight) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   return (
     <form
       className="space-y-3 rounded-2xl border border-line bg-sand/40 p-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (!f.from.trim() || !f.to.trim()) return setError("Add where the flight leaves from and lands.");
         if (`${f.arriveDate}T${f.arriveTime}` <= `${f.departDate}T${f.departTime}` && f.from !== f.to) return setError("The flight needs to land after it leaves (use local times; check the arrival date for overnight flights).");
-        onSave({ ...f, from: f.from.trim(), to: f.to.trim(), airline: f.airline?.trim() || undefined, flightNumber: f.flightNumber?.trim().toUpperCase() || undefined, confirmation: f.confirmation?.trim().toUpperCase() || undefined });
+        const paid = await toPaid(price, value.paid);
+        if (paid === "error") return setError(`We couldn't get today's rate for ${price.currency}. Enter the amount in ${currency} instead.`);
+        onSave({ ...f, paid, from: f.from.trim(), to: f.to.trim(), airline: f.airline?.trim() || undefined, flightNumber: f.flightNumber?.trim().toUpperCase() || undefined, confirmation: f.confirmation?.trim().toUpperCase() || undefined });
       }}
     >
       <div className="flex items-center justify-between">
@@ -192,7 +203,10 @@ function FlightForm({ value, onSave, onCancel }: { value: Flight; onSave: (f: Fl
         <Field label="Departs"><div className="flex gap-1"><input type="date" className="field px-2 py-2" value={f.departDate} onChange={set("departDate")} required /><input type="time" className="field w-28 px-2 py-2" value={f.departTime} onChange={set("departTime")} required /></div></Field>
         <Field label="Lands (local time)"><div className="flex gap-1"><input type="date" className="field px-2 py-2" value={f.arriveDate} onChange={set("arriveDate")} required /><input type="time" className="field w-28 px-2 py-2" value={f.arriveTime} onChange={set("arriveTime")} required /></div></Field>
       </div>
-      <Field label="Booking reference (optional)"><input className="field py-2" value={f.confirmation ?? ""} onChange={set("confirmation")} maxLength={40} /></Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Booking reference (optional)"><input className="field py-2" value={f.confirmation ?? ""} onChange={set("confirmation")} maxLength={40} /></Field>
+        <PriceField value={price} onChange={setPrice} hint="Total for everyone on this booking. For a return ticket, enter it on one flight only." />
+      </div>
       {error && <p role="alert" className="text-sm text-brand-dark">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn-dark py-2">Save flight</button>
@@ -202,18 +216,21 @@ function FlightForm({ value, onSave, onCancel }: { value: Flight; onSave: (f: Fl
   );
 }
 
-function StayForm({ stay, onSave, onCancel }: { stay?: StayBooking; onSave: (b: StayBooking) => void; onCancel: () => void }) {
+function StayForm({ stay, currency, onSave, onCancel }: { stay?: StayBooking; currency: PayCurrency; onSave: (b: StayBooking) => void; onCancel: () => void }) {
   const [b, setB] = useState<StayBooking>(stay ?? { name: "", checkInTime: "15:00", checkOutTime: "11:00" });
   const [error, setError] = useState<string>();
+  const [price, setPrice] = useState(priceDraft(stay?.paid, currency));
   const set = (k: keyof StayBooking) => (e: React.ChangeEvent<HTMLInputElement>) => setB({ ...b, [k]: e.target.value });
   return (
     <form
       className="space-y-3 rounded-2xl border border-line bg-sand/40 p-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (!b.name.trim()) return setError("Add the hotel or rental name.");
         if (b.url && !/^https?:\/\//i.test(b.url.trim())) return setError("Links need to start with https://");
-        onSave({ ...b, name: b.name.trim(), address: b.address?.trim() || undefined, url: b.url?.trim() || undefined, confirmation: b.confirmation?.trim() || undefined, lat: stay?.address === b.address ? stay?.lat : undefined, lon: stay?.address === b.address ? stay?.lon : undefined });
+        const paid = await toPaid(price, stay?.paid);
+        if (paid === "error") return setError(`We couldn't get today's rate for ${price.currency}. Enter the amount in ${currency} instead.`);
+        onSave({ ...b, paid, name: b.name.trim(), address: b.address?.trim() || undefined, url: b.url?.trim() || undefined, confirmation: b.confirmation?.trim() || undefined, lat: stay?.address === b.address ? stay?.lat : undefined, lon: stay?.address === b.address ? stay?.lon : undefined });
       }}
     >
       <Field label="Hotel or rental"><input autoFocus className="field py-2" value={b.name} onChange={set("name")} placeholder="e.g. Memmo Alfama" required maxLength={160} /></Field>
@@ -226,12 +243,55 @@ function StayForm({ stay, onSave, onCancel }: { stay?: StayBooking; onSave: (b: 
         <Field label="Booking reference"><input className="field py-2" value={b.confirmation ?? ""} onChange={set("confirmation")} maxLength={40} /></Field>
         <Field label="Booking link"><input className="field py-2" value={b.url ?? ""} onChange={set("url")} placeholder="https://" maxLength={500} /></Field>
       </div>
+      <PriceField value={price} onChange={setPrice} hint="Total for the whole stay, including taxes and fees." />
       {error && <p role="alert" className="text-sm text-brand-dark">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn-dark py-2">Save stay</button>
         <button type="button" className="btn-ghost py-2" onClick={onCancel}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** A total read from a confirmation, converted at today's rate; skipped if unclear or unconvertible. */
+async function importedPaid(total: number | undefined, currency: string | undefined): Promise<Paid | undefined> {
+  const code = currency?.trim().toUpperCase();
+  if (!total || !(total > 0) || !isPayCurrency(code)) return undefined;
+  const amount = Math.round(total * 100) / 100;
+  const usd = await paidToUsd(amount, code);
+  return usd === undefined ? undefined : { amount, currency: code, usd };
+}
+
+interface PriceDraft {
+  amount: string;
+  currency: PayCurrency;
+}
+
+const priceDraft = (paid: Paid | undefined, currency: PayCurrency): PriceDraft => ({ amount: paid ? String(paid.amount) : "", currency: paid?.currency ?? currency });
+
+/** Turn the price fields into a Paid record (undefined when left blank). Unchanged prices keep their original rate. */
+async function toPaid(d: PriceDraft, before?: Paid): Promise<Paid | undefined | "error"> {
+  const amount = Math.round(Number(d.amount.replace(/[^0-9.]/g, "")) * 100) / 100;
+  if (!d.amount.trim() || !(amount > 0)) return undefined;
+  if (before && before.amount === amount && before.currency === d.currency) return before;
+  const usd = await paidToUsd(amount, d.currency);
+  return usd === undefined ? "error" : { amount, currency: d.currency, usd };
+}
+
+export const formatPaid = (p: Pick<Paid, "amount" | "currency">) => new Intl.NumberFormat("en-CA", { style: "currency", currency: p.currency, maximumFractionDigits: p.amount >= 1000 ? 0 : 2 }).format(p.amount);
+
+function PriceField({ value, onChange, hint }: { value: PriceDraft; onChange: (d: PriceDraft) => void; hint: string }) {
+  return (
+    <div>
+      <span className="label">What you paid (optional)</span>
+      <div className="flex gap-1">
+        <input inputMode="decimal" className="field py-2" placeholder="0.00" aria-label="Amount paid" value={value.amount} onChange={(e) => onChange({ ...value, amount: e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".") })} />
+        <select className="field w-24 px-2 py-2" aria-label="Currency paid" value={value.currency} onChange={(e) => onChange({ ...value, currency: e.target.value as PayCurrency })}>
+          {PAY_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+      <p className="mt-1 text-xs text-muted">{hint}</p>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { blankTrip, curateTrip } from "./curate";
-import { DEFAULT_CURRENCY, FALLBACK_AS_OF, FALLBACK_RATES, type Currency, type FxSnapshot } from "./currency";
+import { DEFAULT_CURRENCY, FALLBACK_AS_OF, FALLBACK_RATES, isCurrency, type Currency, type FxSnapshot, type PayCurrency } from "./currency";
 import { saveTrip } from "./storage";
 import { loadTaste } from "./taste-client";
 import type { Trip, TripRequest } from "./types";
@@ -9,7 +9,7 @@ import type { Trip, TripRequest } from "./types";
 export type PlanNotice = "ai-unavailable" | "ai-failed" | undefined;
 
 let aiStatus: Promise<boolean> | undefined;
-let rateTable: Promise<{ rates: Record<Currency, number>; asOf: string; source: "live" | "fallback" }> | undefined;
+let rateTable: Promise<{ rates: Record<Currency, number>; extra?: Partial<Record<PayCurrency, number>>; asOf: string; source: "live" | "fallback" }> | undefined;
 
 /** Whether this deployment has Giro AI configured (cached per page load). */
 export function checkAI(): Promise<boolean> {
@@ -27,6 +27,20 @@ export async function getFx(currency: Currency = DEFAULT_CURRENCY): Promise<FxSn
     .catch(() => ({ rates: FALLBACK_RATES, asOf: FALLBACK_AS_OF, source: "fallback" as const }));
   const t = await rateTable;
   return { currency, rate: t.rates[currency] ?? FALLBACK_RATES[currency], asOf: t.asOf, source: t.source };
+}
+
+/**
+ * Convert a price someone paid into USD at today's rate. Display currencies always have a rate
+ * (live, else built-in); other currencies only convert from the live feed, so we never store a guess.
+ */
+export async function paidToUsd(amount: number, currency: PayCurrency): Promise<number | undefined> {
+  if (currency === "USD") return Math.round(amount * 100) / 100;
+  rateTable ??= fetch("/api/rates")
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .catch(() => ({ rates: FALLBACK_RATES, asOf: FALLBACK_AS_OF, source: "fallback" as const }));
+  const t = await rateTable;
+  const rate = isCurrency(currency) ? t.rates[currency] ?? FALLBACK_RATES[currency] : t.extra?.[currency];
+  return rate && rate > 0 ? Math.round((amount / rate) * 100) / 100 : undefined;
 }
 
 /** Curate with Claude when requested and available; otherwise (or on failure) use the built-in engine. */

@@ -1,5 +1,5 @@
 import type { AccessNeed } from "./access.ts";
-import type { Currency, FxSnapshot } from "./currency.ts";
+import type { Currency, FxSnapshot, PayCurrency } from "./currency.ts";
 import type { CityFood } from "./food.ts";
 
 export const INTERESTS = [
@@ -85,6 +85,13 @@ export interface Activity {
   picked?: boolean;
 }
 
+/** What a booking actually cost, for everyone on it. `usd` is fixed at the day's rate when entered. */
+export interface Paid {
+  amount: number;
+  currency: PayCurrency;
+  usd: number;
+}
+
 /** A flight the traveller has booked. Times are local wall-clock times at each airport. */
 export interface Flight {
   id: string;
@@ -98,6 +105,8 @@ export interface Flight {
   arriveDate: string;
   arriveTime: string;
   confirmation?: string;
+  /** Total paid for this booking (a round-trip ticket goes on one flight). */
+  paid?: Paid;
 }
 
 /** Where the traveller is actually staying for a leg. */
@@ -110,6 +119,8 @@ export interface StayBooking {
   url?: string;
   lat?: number;
   lon?: number;
+  /** Total paid for the whole stay. */
+  paid?: Paid;
 }
 
 /** An idea waiting outside the schedule: moved out by a flight change, or saved for later. */
@@ -145,6 +156,8 @@ export interface BudgetBreakdown {
   localTransport: number;
   total: number;
   perPerson: number;
+  /** Parts of the total that are what the traveller actually paid (USD), rather than estimates. */
+  booked?: { flights?: number; lodging?: number };
 }
 
 export interface Trip {

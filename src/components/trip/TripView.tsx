@@ -4,7 +4,8 @@ import { CalendarDays, CalendarRange, Check, Copy, Link2, Pencil, Printer, Refre
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { curateTrip } from "@/lib/curate";
+import { fitToFlights } from "@/lib/schedule";
+import { curateTrip, recalcBudget } from "@/lib/curate";
 import { formatRange } from "@/lib/dates";
 import { downloadFile, encodeTrip, tripToICS, tripToText } from "@/lib/export";
 import { money, tripFx } from "@/lib/money";
@@ -186,7 +187,19 @@ export function TripView() {
     } else {
       fresh = curateTrip(r, { fx: tripFx(trip), taste: loadTaste() });
     }
-    commit({ ...fresh, id: trip.id, createdAt: trip.createdAt, packed: trip.packed });
+    // Regenerating re-picks the stops; everything the traveller entered stays.
+    const kept: Trip = {
+      ...fresh,
+      id: trip.id,
+      createdAt: trip.createdAt,
+      packed: trip.packed,
+      flights: trip.flights,
+      notes: trip.notes,
+      packingAdded: trip.packingAdded,
+      packingRemoved: trip.packingRemoved,
+      stays: fresh.stays.map((s, i) => (trip.stays[i]?.city === s.city ? { ...s, booking: trip.stays[i].booking } : s)),
+    };
+    commit(recalcBudget(kept.flights?.length ? fitToFlights(kept).trip : kept));
     setRegenerating(false);
   }
 
@@ -315,7 +328,8 @@ export function TripView() {
               trip={trip}
               readOnly={readOnly}
               onChange={(c) => {
-                commit(c.trip);
+                // Booked prices replace estimates in the budget.
+                commit(recalcBudget(c.trip));
                 if (c.message) flash(c.message);
               }}
             />
