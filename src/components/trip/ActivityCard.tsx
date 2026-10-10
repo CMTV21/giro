@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert } from "lucide-react";
+import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
@@ -42,6 +42,7 @@ export function ActivityCard({
   tripId,
   time,
   caution,
+  loved,
   handle,
   extra,
   actions,
@@ -53,6 +54,8 @@ export function ActivityCard({
   time?: ActivityTime;
   /** Why this stop may not suit the traveller's access needs. */
   caution?: string;
+  /** Community pick: how many travellers backed this stop. */
+  loved?: { travellers: number };
   /** Drag handle (supplied by the sortable wrapper). */
   handle?: React.ReactNode;
   /** Extra content under the description, e.g. history and facts. */
@@ -121,6 +124,7 @@ export function ActivityCard({
           {!isFree && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>}
           {!isTransit && !isFree && <span>{a.estCost ? formatMoney(a.estCost, fx, { approx: true }) : "Free"}</span>}
           {a.booked && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Booked</span>}
+          {loved && <span className="inline-flex items-center gap-1 text-sky-800" title="Booked, picked or voted up by this many Giro travellers"><Users className="h-3.5 w-3.5" /> Loved by {loved.travellers} travellers</span>}
           {handle && !actions.readOnly && <span className="no-print ml-auto">{handle}</span>}
         </div>
         {(time?.conflict || time?.overflow) && (

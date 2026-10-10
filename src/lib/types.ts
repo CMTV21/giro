@@ -81,6 +81,8 @@ export interface Activity {
   note?: string;
   /** Added or renamed by the traveller rather than picked from the catalog. */
   custom?: boolean;
+  /** The traveller chose this (from Ideas, a swap or the food guide) rather than Giro placing it. */
+  picked?: boolean;
 }
 
 /** A flight the traveller has booked. Times are local wall-clock times at each airport. */

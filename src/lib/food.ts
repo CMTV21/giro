@@ -38,7 +38,7 @@ export interface CityFood {
 /** Rough spend per adult (USD) by price level, for the budget and the cost line. */
 export const PRICE_USD: Record<Price, number> = { 1: 15, 2: 35, 3: 70, 4: 160 };
 
-const slugify = (s: string) => normalizeCity(s).replace(/ /g, "-").slice(0, 60);
+export const slugify = (s: string) => normalizeCity(s).replace(/ /g, "-").slice(0, 60);
 export const restaurantRef = (city: string, r: Pick<Restaurant, "name">) => `food:${slugify(city)}:${slugify(r.name)}`;
 
 export function foodFor(trip: Pick<Trip, "food">, city: string): CityFood {

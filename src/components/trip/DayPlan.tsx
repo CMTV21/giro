@@ -3,11 +3,12 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BedDouble, Navigation, Plane, Plus, Printer, Shuffle, UtensilsCrossed, X } from "lucide-react";
+import { BedDouble, Navigation, Plane, Plus, Printer, Shuffle, Users, UtensilsCrossed, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { accessCaution, effortOf } from "@/lib/access";
 import { mapsRouteUrl } from "@/lib/booking";
+import { lovedLabel, useCommunity, type CommunityPicks } from "@/lib/community-client";
 import { newId, suggestAlternatives } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
 import { money, tripFx } from "@/lib/money";
@@ -47,6 +48,7 @@ export function DayPlan({
   const [editing, setEditing] = useState<string>();
   const fx = tripFx(trip);
   const shared = Boolean(onVote);
+  const community = useCommunity(day.city);
   const window = dayWindow(trip, day);
   const items = scheduleDay(trip, day, window);
   const timed = new Map(items.filter((i) => i.activity).map((i) => [i.activity!.id, i]));
@@ -104,6 +106,7 @@ export function DayPlan({
                         fx={fx}
                         tripId={trip.id}
                         time={timed.get(a.id)}
+                        loved={a.ref ? community[a.ref] : undefined}
                         caution={accessCaution(effortOf({ key: a.ref ?? "", hrs: a.durationHrs }), trip.request.access)}
                         handle={handle}
                         extra={a.category !== "transit" && a.category !== "free" ? renderExtra?.(a, day.city) : undefined}
@@ -154,6 +157,7 @@ export function DayPlan({
                       )}
                       {swapping === a.id && (
                         <SwapPanel
+                          community={community}
                           trip={trip}
                           day={day}
                           slot={a.slot}
@@ -161,7 +165,7 @@ export function DayPlan({
                           onPick={(alt) => {
                             recordSignal("swapped_out", a.category);
                             recordSignal("swapped_in", alt.category);
-                            update(day.activities.map((x) => (x.id === a.id ? alt : x)));
+                            update(day.activities.map((x) => (x.id === a.id ? { ...alt, picked: true } : x)));
                             setSwapping(undefined);
                           }}
                         />
@@ -254,8 +258,9 @@ function StayRow({ name, note }: { name: string; note: string }) {
   );
 }
 
-function SwapPanel({ trip, day, slot, onPick, onClose }: { trip: Trip; day: Day; slot: Slot; onPick: (a: Activity) => void; onClose: () => void }) {
-  const alternatives = suggestAlternatives(trip, day.index, slot, 4, loadTaste());
+function SwapPanel({ trip, day, slot, community, onPick, onClose }: { trip: Trip; day: Day; slot: Slot; community: CommunityPicks; onPick: (a: Activity) => void; onClose: () => void }) {
+  const loved = (a: Activity) => (a.ref ? community[a.ref]?.travellers ?? 0 : 0);
+  const alternatives = suggestAlternatives(trip, day.index, slot, 6, loadTaste()).sort((a, b) => loved(b) - loved(a)).slice(0, 4);
   return (
     <div className="mb-5 ml-14 rounded-2xl border border-ink/10 bg-sand/60 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -270,6 +275,7 @@ function SwapPanel({ trip, day, slot, onPick, onClose }: { trip: Trip; day: Day;
                 <span className="block text-sm font-semibold">{alt.title}</span>
                 <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{alt.description}</span>
                 <span className="mt-1.5 block text-xs font-medium text-ink-soft">{alt.area} · {alt.durationHrs}h · {alt.estCost ? money(trip, alt.estCost, true) : "Free"}</span>
+                {alt.ref && community[alt.ref] && <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-800"><Users className="h-3 w-3" /> {lovedLabel(community[alt.ref])}</span>}
               </button>
             </li>
           ))}

@@ -2,8 +2,9 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArchiveRestore, Ban, GripVertical, Lightbulb, Plus, Star, X } from "lucide-react";
+import { ArchiveRestore, Ban, GripVertical, Lightbulb, Plus, Star, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { lovedLabel, useCommunity, type CommunityPick } from "@/lib/community-client";
 import { reviewsLink, trackedHref } from "@/lib/booking";
 import { formatDate } from "@/lib/dates";
 import { ideasFor, type Idea } from "@/lib/ideas";
@@ -18,7 +19,7 @@ export const ideaDragId = (id: string) => `idea::${id}`;
 export function IdeasPanel({ trip, readOnly, onAdd, onDismiss }: { trip: Trip; readOnly: boolean; onAdd: (idea: Idea, dayIndex: number) => void; onDismiss: (id: string) => void }) {
   const cities = [...new Set(trip.days.map((d) => d.city))];
   const [city, setCity] = useState(cities[0]);
-  const [filter, setFilter] = useState<Interest | "all">("all");
+  const [filter, setFilter] = useState<Interest | "all" | "loved">("all");
   const [blocks, setBlocks] = useState(0);
   const ideas = useMemo(() => ideasFor(trip, city ?? cities[0], loadTaste()), [trip, city, cities, blocks]); // eslint-disable-line react-hooks/exhaustive-deps
   const block = (idea: Idea) => {
@@ -28,7 +29,12 @@ export function IdeasPanel({ trip, readOnly, onAdd, onDismiss }: { trip: Trip; r
     if (idea.origin === "parked") onDismiss(idea.id);
     setBlocks((n) => n + 1);
   };
-  const shown = ideas.filter((i) => filter === "all" || i.categories.includes(filter)).slice(0, 30);
+  const community = useCommunity(city ?? cities[0]);
+  const loved = (i: Idea) => (i.ref ? community[i.ref]?.travellers ?? 0 : 0);
+  // Parked ideas first (they're yours), then community favourites, then Giro's ranking.
+  const ranked = [...ideas].sort((a, b) => Number(b.origin === "parked") - Number(a.origin === "parked") || loved(b) - loved(a));
+  const shown = ranked.filter((i) => (filter === "loved" ? loved(i) > 0 : filter === "all" || i.categories.includes(filter))).slice(0, 30);
+  const anyLoved = ideas.some((i) => loved(i) > 0);
   const cats = [...new Set(ideas.flatMap((i) => i.categories))].slice(0, 8) as Interest[];
   const days = trip.days.filter((d) => d.city === city);
 
@@ -47,19 +53,20 @@ export function IdeasPanel({ trip, readOnly, onAdd, onDismiss }: { trip: Trip; r
       )}
       <div className="mt-3 flex flex-wrap gap-1">
         <button type="button" className="chip px-2.5 py-1 text-xs" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
+        {anyLoved && <button type="button" className="chip px-2.5 py-1 text-xs" aria-pressed={filter === "loved"} onClick={() => setFilter("loved")}><Users className="h-3 w-3" /> Loved by travellers</button>}
         {cats.map((c) => (
           <button key={c} type="button" className="chip px-2.5 py-1 text-xs" aria-pressed={filter === c} onClick={() => setFilter(c)}>{INTEREST_META[c].label}</button>
         ))}
       </div>
       <ul className="mt-3 space-y-2">
-        {shown.map((idea) => <IdeaCard key={idea.id} idea={idea} trip={trip} days={days} readOnly={readOnly} onAdd={onAdd} onDismiss={onDismiss} onBlock={block} />)}
+        {shown.map((idea) => <IdeaCard key={idea.id} idea={idea} trip={trip} days={days} readOnly={readOnly} onAdd={onAdd} onDismiss={onDismiss} onBlock={block} loved={idea.ref ? community[idea.ref] : undefined} />)}
         {!shown.length && <li className="py-4 text-center text-sm text-muted">No ideas left for this filter.</li>}
       </ul>
     </section>
   );
 }
 
-function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss, onBlock }: { idea: Idea; trip: Trip; days: Trip["days"]; readOnly: boolean; onAdd: (idea: Idea, dayIndex: number) => void; onDismiss: (id: string) => void; onBlock: (idea: Idea) => void }) {
+function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss, onBlock, loved }: { idea: Idea; trip: Trip; days: Trip["days"]; readOnly: boolean; onAdd: (idea: Idea, dayIndex: number) => void; onDismiss: (id: string) => void; onBlock: (idea: Idea) => void; loved?: CommunityPick }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: ideaDragId(idea.id), data: { type: "idea", idea }, disabled: readOnly });
   const meta = CATEGORY_META[idea.category] ?? CATEGORY_META.free;
   const Icon = meta.icon;
@@ -78,6 +85,7 @@ function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss, onBlock }: { i
           <a href={trackedHref(reviewsLink(idea.title, idea.city, tripFx(trip).currency), trip.id)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-ink-soft hover:text-ink">
             <Star className="h-3 w-3" /> Reviews
           </a>
+          {loved && <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-900"><Users className="h-3 w-3" /> {lovedLabel(loved)}</p>}
           {idea.origin === "parked" && idea.reason && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"><ArchiveRestore className="h-3 w-3" /> {idea.reason}</p>
           )}

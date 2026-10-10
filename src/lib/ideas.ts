@@ -38,5 +38,5 @@ export function ideasFor(trip: Trip, city: string, taste?: TasteProfile): Idea[]
 /** Turn an idea into a fresh plan activity (new id, no pinned time). */
 export function ideaToActivity(idea: Idea, id: string, slot: Slot): Activity {
   const { city: _c, origin: _o, reason: _r, categories: _k, ...rest } = idea;
-  return { ...rest, id, slot, start: undefined };
+  return { ...rest, id, slot, start: undefined, picked: true };
 }

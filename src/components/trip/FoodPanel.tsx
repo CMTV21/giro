@@ -33,7 +33,7 @@ export function FoodPanel({ trip, readOnly, onChange, onMessage }: { trip: Trip;
   for (const d of trip.days) for (const a of d.activities) if (a.ref?.startsWith("food:")) planned.set(a.ref, d.index);
 
   const add = (r: Restaurant, dayIndex: number) => {
-    onChange(recalcBudget(addActivity(trip, dayIndex, restaurantToActivity(r, city, newId()))));
+    onChange(recalcBudget(addActivity(trip, dayIndex, { ...restaurantToActivity(r, city, newId()), picked: true })));
     onMessage(`${r.name} added to Day ${dayIndex + 1} for ${r.meal}.${r.meal === "breakfast" ? "" : ` It takes the place of the open ${r.meal} break in your schedule.`}`);
   };
 
