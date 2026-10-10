@@ -39,6 +39,8 @@ test("lengthening keeps edits, adds fresh non-repeating days, keeps departure la
   assert.deepEqual(r.trip.days.map((d) => d.index), [...Array(9).keys()]);
   assert.ok(r.trip.days.every((d) => d.activities.length > 0), "no empty days");
   assert.equal(r.trip.title, "9 days in Lisbon", "automatic title follows the length");
+  assert.match(r.trip.summary, /\b9-day\b/);
+  assert.doesNotMatch(r.trip.summary, /\b6-day\b/);
   assert.ok(TripSchema.safeParse(r.trip).success);
 });
 

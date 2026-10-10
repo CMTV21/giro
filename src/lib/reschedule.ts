@@ -151,6 +151,8 @@ export function rescheduleTrip(trip: Trip, start: string, end: string, taste?: T
     ...trip,
     request: req,
     title: autoTitle ? tripTitle(legs, days.length) : trip.title,
+    // The generated summary names the length ("a balanced 6-day comfort trip").
+    summary: trip.summary.replace(new RegExp(`\\b${trip.days.length}-day\\b`), `${days.length}-day`),
     days,
     stays,
     parked: [...(trip.parked ?? []), ...parked],
