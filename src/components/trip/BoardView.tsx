@@ -10,7 +10,8 @@ import { formatDate } from "@/lib/dates";
 import { ideasFor, type Idea } from "@/lib/ideas";
 import { money, tripFx } from "@/lib/money";
 import { applyStopEdit, customStop, draftFrom, emptyDraft, MAX_STOP_HOURS, parkActivity, setStart } from "@/lib/plan-edit";
-import { clock, dayWindow, fromMinutes, scheduleDay, toMinutes, travelMinutes, type ScheduledItem } from "@/lib/schedule";
+import type { StopHours } from "@/lib/hours-client";
+import { clock, dayWindow, fromMinutes, scheduleDay, toMinutes, travelLabel, travelMinutes, type ScheduledItem } from "@/lib/schedule";
 import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Activity, Day, Trip } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
@@ -35,13 +36,15 @@ export interface BoardPreview {
   blocked?: string;
 }
 
+type HoursOf = (a: Activity, day: Day, item?: Pick<ScheduledItem, "start" | "end">) => StopHours | undefined;
+
 type Selection = { kind: "stop"; activityId: string; editing?: boolean } | { kind: "add"; dayIndex: number; minutes: number };
 
 /**
  * The multi-day board: every day side by side on one clock. Drag stops between days and times,
  * stretch them to change how long they take, tap one to edit or book it, tap an empty spot to add.
  */
-export function BoardView({ trip, readOnly, preview, onChange, onMessage }: { trip: Trip; readOnly: boolean; preview?: BoardPreview; onChange: (t: Trip) => void; onMessage: (m: string) => void }) {
+export function BoardView({ trip, readOnly, preview, onChange, onMessage, hoursOf }: { trip: Trip; readOnly: boolean; preview?: BoardPreview; onChange: (t: Trip) => void; onMessage: (m: string) => void; hoursOf?: HoursOf }) {
   const [selected, setSelected] = useState<Selection>();
   const place = (source: BoardSource, dayIndex: number, minutes: number) => {
     const r = placeAtTime(trip, source, dayIndex, minutes);
@@ -75,6 +78,7 @@ export function BoardView({ trip, readOnly, preview, onChange, onMessage }: { tr
                 onSelect={(activityId) => setSelected({ kind: "stop", activityId })}
                 onAddAt={(minutes) => setSelected({ kind: "add", dayIndex: day.index, minutes })}
                 onResize={(activityId, mins) => onChange(setDuration(trip, day.index, activityId, mins))}
+                hoursOf={hoursOf}
               />
             ))}
           </div>
@@ -85,7 +89,7 @@ export function BoardView({ trip, readOnly, preview, onChange, onMessage }: { tr
         {selected && !readOnly ? (
           <div className="fixed inset-x-0 bottom-0 z-40 max-h-[75vh] overflow-y-auto rounded-t-3xl border border-line bg-surface p-4 shadow-lift lg:static lg:max-h-none lg:rounded-2xl lg:shadow-none">
             {selected.kind === "stop" ? (
-              <StopPanel trip={trip} selection={selected} onClose={() => setSelected(undefined)} onEditing={(editing) => setSelected({ ...selected, editing })} onChange={onChange} onPlace={(source, d, m) => place(source, d, m)} />
+              <StopPanel trip={trip} selection={selected} onClose={() => setSelected(undefined)} onEditing={(editing) => setSelected({ ...selected, editing })} onChange={onChange} onPlace={(source, d, m) => place(source, d, m)} hoursOf={hoursOf} />
             ) : (
               <AddPanel trip={trip} dayIndex={selected.dayIndex} minutes={selected.minutes} onClose={() => setSelected(undefined)} onPlace={(source) => place(source, selected.dayIndex, selected.minutes) && setSelected(undefined)} onPlaceAt={(source, m) => place(source, selected.dayIndex, m) && setSelected(undefined)} />
             )}
@@ -121,7 +125,7 @@ function nextFreeTime(trip: Trip, day: Day, lengthMins: number): number {
   return snap(Math.min(t, BOARD_TO - lengthMins));
 }
 
-function DayColumn({ trip, day, readOnly, preview, selectedId, onSelect, onAddAt, onResize }: { trip: Trip; day: Day; readOnly: boolean; preview?: BoardPreview; selectedId?: string; onSelect: (id: string) => void; onAddAt: (minutes: number) => void; onResize: (id: string, minutes: number) => void }) {
+function DayColumn({ trip, day, readOnly, preview, selectedId, onSelect, onAddAt, onResize, hoursOf }: { trip: Trip; day: Day; readOnly: boolean; preview?: BoardPreview; selectedId?: string; onSelect: (id: string) => void; onAddAt: (minutes: number) => void; onResize: (id: string, minutes: number) => void; hoursOf?: HoursOf }) {
   const { setNodeRef, isOver } = useDroppable({ id: boardDayId(day.index), data: { type: "board-day", dayIndex: day.index }, disabled: readOnly });
   const w = dayWindow(trip, day);
   const items = scheduleDay(trip, day, w);
@@ -154,15 +158,17 @@ function DayColumn({ trip, day, readOnly, preview, selectedId, onSelect, onAddAt
           const prev = acts[k];
           const mins = travelMinutes(prev.activity, it.activity);
           if (!mins || it.start - prev.end < mins || it.start <= BOARD_FROM) return null;
+          // Don't draw over a meal or flight in the same window.
+          if (items.some((x) => x.kind !== "activity" && x.start < it.start && x.end > it.start - mins)) return null;
           return (
             <span key={`t-${it.activity!.id}`} className="pointer-events-none absolute left-3 flex items-center gap-1 border-l-2 border-dotted border-ink/25 pl-1.5 text-[10px] text-muted" style={{ top: (it.start - mins - BOARD_FROM) * BOARD_PX, height: mins * BOARD_PX }}>
-              {mins * BOARD_PX >= 14 && `~${mins} min`}
+              {mins * BOARD_PX >= 14 && (travelLabel(prev.activity, it.activity)?.replace(" by taxi or transit", " ride") ?? `~${mins} min`)}
             </span>
           );
         })}
 
         {items.map((it) => (it.end <= BOARD_FROM || it.start >= BOARD_TO ? null : it.kind === "activity" ? (
-          <StopBlock key={it.activity!.id} trip={trip} day={day} item={it} readOnly={readOnly} selected={selectedId === it.activity!.id} onSelect={() => onSelect(it.activity!.id)} onResize={(m) => onResize(it.activity!.id, m)} />
+          <StopBlock key={it.activity!.id} trip={trip} day={day} item={it} readOnly={readOnly} selected={selectedId === it.activity!.id} onSelect={() => onSelect(it.activity!.id)} onResize={(m) => onResize(it.activity!.id, m)} hoursIssue={hoursOf?.(it.activity!, day, it)?.issue} />
         ) : (
           <div key={`${it.kind}-${it.label}-${it.start}`} className={`pointer-events-none absolute inset-x-1.5 overflow-hidden rounded-lg border px-2 py-1 text-[11px] leading-tight ${it.kind === "flight" ? "border-sky-300 bg-sky-50 text-sky-900" : "border-dashed border-line bg-paper/80 text-muted"}`} style={blockBox(it.start, it.end)}>
             <span className="font-semibold">{clock(it.start)}</span> {it.label}
@@ -184,7 +190,7 @@ const blockBox = (start: number, end: number) => ({
   height: Math.max(20, (Math.min(end, BOARD_TO) - Math.max(start, BOARD_FROM)) * BOARD_PX - 2),
 });
 
-function StopBlock({ trip, day, item, readOnly, selected, onSelect, onResize }: { trip: Trip; day: Day; item: ScheduledItem; readOnly: boolean; selected: boolean; onSelect: () => void; onResize: (minutes: number) => void }) {
+function StopBlock({ trip, day, item, readOnly, selected, onSelect, onResize, hoursIssue }: { trip: Trip; day: Day; item: ScheduledItem; readOnly: boolean; selected: boolean; onSelect: () => void; onResize: (minutes: number) => void; hoursIssue?: string }) {
   const a = item.activity!;
   const movable = !readOnly && a.category !== "transit";
   const { listeners, setNodeRef, isDragging } = useDraggable({ id: boardStopId(a.id), data: { type: "board-stop", dayIndex: day.index, activityId: a.id, lengthMins: Math.round(a.durationHrs * 60), title: a.title }, disabled: !movable });
@@ -193,7 +199,7 @@ function StopBlock({ trip, day, item, readOnly, selected, onSelect, onResize }: 
   const [stretch, setStretch] = useState<number>();
   const length = stretch ?? item.end - item.start;
   const box = blockBox(item.start, item.start + length);
-  const tone = item.overflow || item.conflict ? "border-amber-300 bg-amber-50 text-amber-950" : `border-line ${CATEGORY_META[a.category]?.tone ?? "bg-sand"}`;
+  const tone = item.overflow || item.conflict || hoursIssue ? "border-amber-300 bg-amber-50 text-amber-950" : `border-line ${CATEGORY_META[a.category]?.tone ?? "bg-sand"}`;
   const cost = a.category !== "transit" && a.category !== "free" ? (a.estCost ? money(trip, a.estCost, true) : "Free") : undefined;
   const tall = box.height >= 52;
 
@@ -203,7 +209,7 @@ function StopBlock({ trip, day, item, readOnly, selected, onSelect, onResize }: 
       {...dragListeners}
       className={`group absolute inset-x-1.5 overflow-hidden rounded-lg border text-[11px] leading-tight shadow-sm transition-shadow ${tone} ${selected ? "ring-2 ring-ink" : ""} ${isDragging ? "opacity-40" : ""} ${movable ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{ ...box, zIndex: stretch !== undefined || selected ? 15 : undefined }}
-      title={item.conflict ?? (item.overflow ? "Runs outside the day's free time" : undefined)}
+      title={item.conflict ?? hoursIssue ?? (item.overflow ? "Runs outside the day's free time" : undefined)}
     >
       <button type="button" onClick={onSelect} disabled={readOnly} className="block h-full w-full px-2 py-1 text-left" aria-label={`${a.title}, ${clock(item.start)} to ${clock(item.start + length)}${movable ? ". Drag to move, or open to edit" : ""}`}>
         <span className="flex items-center gap-1 font-semibold">
@@ -258,13 +264,14 @@ function PanelHeader({ title, sub, onClose }: { title: string; sub?: string; onC
   );
 }
 
-function StopPanel({ trip, selection, onClose, onEditing, onChange, onPlace }: { trip: Trip; selection: Extract<Selection, { kind: "stop" }>; onClose: () => void; onEditing: (on: boolean) => void; onChange: (t: Trip) => void; onPlace: (source: BoardSource, dayIndex: number, minutes: number) => Trip | void }) {
+function StopPanel({ trip, selection, onClose, onEditing, onChange, onPlace, hoursOf }: { trip: Trip; selection: Extract<Selection, { kind: "stop" }>; onClose: () => void; onEditing: (on: boolean) => void; onChange: (t: Trip) => void; onPlace: (source: BoardSource, dayIndex: number, minutes: number) => Trip | void; hoursOf?: HoursOf }) {
   // Found by id, so the panel follows a stop dragged to another day.
   const day = trip.days.find((d) => d.activities.some((x) => x.id === selection.activityId));
   const a = day?.activities.find((x) => x.id === selection.activityId);
   if (!day || !a) return <PanelHeader title="This stop has moved" onClose={onClose} />;
   const fx = tripFx(trip);
   const item = scheduleDay(trip, day).find((i) => i.activity?.id === a.id);
+  const hours = item ? hoursOf?.(a, day, item) : undefined;
   const start = item?.start ?? BOARD_FROM;
   const lengthMins = Math.round(a.durationHrs * 60);
   const isTransit = a.category === "transit";
@@ -298,6 +305,8 @@ function StopPanel({ trip, selection, onClose, onEditing, onChange, onPlace }: {
       <PanelHeader title={a.title} sub={[meta.label, a.area].filter(Boolean).join(" · ")} onClose={onClose} />
       {a.description && <p className="mb-3 text-sm text-ink-soft">{a.description}</p>}
       {item?.conflict && <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">{item.conflict}</p>}
+      {hours?.issue && <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">{hours.issue}</p>}
+      {hours && <p className="mb-3 text-xs text-muted">Open {formatDate(day.date, { weekday: "long" })}: <span className="font-semibold text-ink-soft">{hours.label}</span> (Google)</p>}
 
       {!isTransit && (
         <div className="grid grid-cols-2 gap-3">

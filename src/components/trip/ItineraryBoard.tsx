@@ -21,7 +21,9 @@ import { useEffect, useState } from "react";
 import { BOARD_FROM, BOARD_TO, minutesAt, placeAtTime, type BoardSource } from "@/lib/board";
 import { recalcBudget } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
+import { useOpeningHours } from "@/lib/hours-client";
 import { clock } from "@/lib/schedule";
+import { useTravelTimes } from "@/lib/travel-client";
 import type { Idea } from "@/lib/ideas";
 import { dismissIdea, insertIdea, moveStop, parkActivity } from "@/lib/plan-edit";
 import type { VoteTally } from "@/lib/storage";
@@ -86,6 +88,9 @@ export function ItineraryBoard({
   );
 
   const commit = (next: Trip) => onChange(recalcBudget(next));
+  const hoursOf = useOpeningHours(trip);
+  // Real walking or ride times between stops (when routing is configured); saved on the trip.
+  useTravelTimes(trip, !readOnly, commit);
   const dayOf = (activityId: string) => trip.days.find((d) => d.activities.some((a) => a.id === activityId));
 
   function onDragStart(e: DragStartEvent) {
@@ -147,7 +152,7 @@ export function ItineraryBoard({
     if (result.trip !== trip) commit(result.trip);
   }
 
-  const groupProps = { votes, onVote, readOnly, renderExtra, renderMap };
+  const groupProps = { votes, onVote, readOnly, renderExtra, renderMap, hoursOf };
 
   return (
     <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => { setDragging(undefined); setPreview(undefined); }}>
@@ -166,7 +171,7 @@ export function ItineraryBoard({
       </div>
 
       {view === "timeline" ? (
-        <BoardView trip={trip} readOnly={readOnly} preview={preview} onChange={commit} onMessage={onMessage} />
+        <BoardView trip={trip} readOnly={readOnly} preview={preview} onChange={commit} onMessage={onMessage} hoursOf={hoursOf} />
       ) : (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-12">

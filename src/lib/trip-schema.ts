@@ -30,6 +30,7 @@ const ActivitySchema = z.object({
   note: str(500).optional(),
   custom: z.boolean().optional(),
   picked: z.boolean().optional(),
+  travel: z.object({ from: str(40), mins: z.number().int().min(0).max(600), mode: z.enum(["walk", "ride"]) }).optional(),
 });
 
 const time = z.string().regex(/^\d{1,2}:\d{2}$/);

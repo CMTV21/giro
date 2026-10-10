@@ -109,7 +109,15 @@ const isMeal = (a: Activity) => MEAL_WORDS.test(`${a.title} ${a.description}`);
 
 export function travelMinutes(from?: Activity, to?: Activity): number {
   if (!from || !to) return 0;
+  // A measured time (walking, or a ride for longer hops) wins, plus a little slack for finding the door.
+  if (to.travel && to.travel.from === from.id) return Math.max(5, Math.round(to.travel.mins + 5));
   return from.area && to.area && from.area === to.area ? 20 : 40;
+}
+
+/** How a hop is made, when measured: "~12 min walk" or "~25 min by taxi or transit". */
+export function travelLabel(from?: Activity, to?: Activity): string | undefined {
+  if (!from || !to?.travel || to.travel.from !== from.id) return undefined;
+  return to.travel.mode === "walk" ? `~${to.travel.mins} min walk` : `~${to.travel.mins} min by taxi or transit`;
 }
 
 /** Clock times for every activity of a day, plus meals and flight blocks. */

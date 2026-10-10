@@ -154,4 +154,19 @@ export const MIGRATIONS: string[][] = [
     )`,
     `create index trip_inbox_trip_idx on trip_inbox(trip_id, created_at)`,
   ],
+  [
+    // Paid lookups are cached so each place or route is fetched rarely.
+    `create table place_hours (
+      key text primary key,
+      hours jsonb,
+      maps_url text,
+      fetched_at timestamptz not null default now()
+    )`,
+    `create table route_cache (
+      key text primary key,
+      minutes integer not null,
+      km double precision not null,
+      fetched_at timestamptz not null default now()
+    )`,
+  ],
 ];

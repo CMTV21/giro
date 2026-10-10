@@ -12,7 +12,8 @@ import { lovedLabel, useCommunity, type CommunityPicks } from "@/lib/community-c
 import { newId, suggestAlternatives } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
 import { money, tripFx } from "@/lib/money";
-import { clock, dayWindow, scheduleDay, toMinutes, type ScheduledItem } from "@/lib/schedule";
+import { clock, dayWindow, scheduleDay, toMinutes, travelLabel, type ScheduledItem } from "@/lib/schedule";
+import { hopsOf } from "@/lib/travel";
 import type { VoteTally } from "@/lib/storage";
 import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Activity, Day, Slot, Trip } from "@/lib/types";
@@ -28,6 +29,8 @@ export interface DayGroupProps {
   renderExtra?: (a: Activity, city: string) => React.ReactNode;
   /** Optional map for the day. */
   renderMap?: (day: Day, items: ScheduledItem[]) => React.ReactNode;
+  /** Opening hours for a stop on its day, when known. */
+  hoursOf?: (a: Activity, day: Day, item?: Pick<ScheduledItem, "start" | "end">) => { label: string; issue?: string; mapsUrl?: string } | undefined;
 }
 
 export const dayDropId = (index: number) => `day::${index}`;
@@ -42,6 +45,7 @@ export function DayPlan({
   readOnly,
   renderExtra,
   renderMap,
+  hoursOf,
 }: { trip: Trip; day: Day; onChange: (day: Day) => void; onPark: (a: Activity, reason: string) => void } & DayGroupProps) {
   const [swapping, setSwapping] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -53,6 +57,7 @@ export function DayPlan({
   const items = scheduleDay(trip, day, window);
   const timed = new Map(items.filter((i) => i.activity).map((i) => [i.activity!.id, i]));
   const sortable = items.filter((i) => i.activity).map((i) => i.activity!.id);
+  const fromOf = new Map(hopsOf(trip, day).map((h) => [h.to.id, h.from]));
   const { setNodeRef, isOver } = useDroppable({ id: dayDropId(day.index), data: { type: "day", dayIndex: day.index }, disabled: readOnly });
 
   const update = (activities: Activity[]) => onChange({ ...day, activities });
@@ -108,6 +113,8 @@ export function DayPlan({
                         time={timed.get(a.id)}
                         loved={a.ref ? community[a.ref] : undefined}
                         caution={accessCaution(effortOf({ key: a.ref ?? "", hrs: a.durationHrs }), trip.request.access)}
+                        hours={hoursOf?.(a, day, timed.get(a.id))}
+                        arrive={travelLabel(fromOf.get(a.id), a)}
                         handle={handle}
                         extra={a.category !== "transit" && a.category !== "free" ? renderExtra?.(a, day.city) : undefined}
                         actions={{

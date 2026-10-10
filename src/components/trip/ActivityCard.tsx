@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
+import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, Footprints, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
@@ -42,6 +42,8 @@ export function ActivityCard({
   tripId,
   time,
   caution,
+  hours,
+  arrive,
   loved,
   handle,
   extra,
@@ -54,6 +56,10 @@ export function ActivityCard({
   time?: ActivityTime;
   /** Why this stop may not suit the traveller's access needs. */
   caution?: string;
+  /** Opening hours for the visit's date, with a warning when the plan doesn't fit them. */
+  hours?: { label: string; issue?: string; mapsUrl?: string };
+  /** How you get here from the previous stop, when measured ("~12 min walk"). */
+  arrive?: string;
   /** Community pick: how many travellers backed this stop. */
   loved?: { travellers: number };
   /** Drag handle (supplied by the sortable wrapper). */
@@ -124,12 +130,18 @@ export function ActivityCard({
           {!isFree && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>}
           {!isTransit && !isFree && <span>{a.estCost ? formatMoney(a.estCost, fx, { approx: true }) : "Free"}</span>}
           {a.booked && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Booked</span>}
+          {arrive && <span className="inline-flex items-center gap-1" title="From the previous stop"><Footprints className="h-3.5 w-3.5" /> {arrive}</span>}
           {loved && <span className="inline-flex items-center gap-1 text-sky-800" title="Booked, picked or voted up by this many Giro travellers"><Users className="h-3.5 w-3.5" /> Loved by {loved.travellers} travellers</span>}
           {handle && !actions.readOnly && <span className="no-print ml-auto">{handle}</span>}
         </div>
         {(time?.conflict || time?.overflow) && (
           <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
             <TriangleAlert className="h-3.5 w-3.5" /> {time.conflict ?? "Runs past the end of the day, or past your flight cut-off."}
+          </p>
+        )}
+        {hours?.issue && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800" title={`Opening hours that day: ${hours.label} (from Google). Check before you go.`}>
+            <Clock className="h-3.5 w-3.5" /> {hours.issue}{hours.label !== "Closed" ? ` Open ${hours.label} that day.` : ""}
           </p>
         )}
         {caution && (

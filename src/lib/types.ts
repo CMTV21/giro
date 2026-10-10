@@ -83,6 +83,8 @@ export interface Activity {
   custom?: boolean;
   /** The traveller chose this (from Ideas, a swap or the food guide) rather than Giro placing it. */
   picked?: boolean;
+  /** Measured travel time from the stop before it (by id); ignored once the order changes. */
+  travel?: { from: string; mins: number; mode: "walk" | "ride" };
 }
 
 /** What a booking actually cost, for everyone on it. `usd` is fixed at the day's rate when entered. */
