@@ -177,4 +177,12 @@ export const MIGRATIONS: string[][] = [
       fetched_at timestamptz not null default now()
     )`,
   ],
+  [
+    // Recently seen fares per route, dates and currency (the provider's data is itself a cache).
+    `create table fare_cache (
+      key text primary key,
+      data jsonb,
+      fetched_at timestamptz not null default now()
+    )`,
+  ],
 ];

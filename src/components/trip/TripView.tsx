@@ -357,7 +357,7 @@ export function TripView() {
         )}
         {tab === "food" && <FoodPanel trip={trip} readOnly={readOnly} onChange={commit} onMessage={flash} />}
         {tab === "live" && <LivePanel trip={trip} readOnly={readOnly} onChange={commit} />}
-        {tab === "book" && <BookPanel trip={trip} />}
+        {tab === "book" && <BookPanel trip={trip} readOnly={readOnly} onChange={(t, message) => { commit(recalcBudget(t)); flash(message); }} />}
         {tab === "budget" && <BudgetPanel trip={trip} />}
         {tab === "group" && <GroupPanel bundle={bundle} onChanged={load} onSaveToAccount={moveToAccount} onLeft={() => router.push("/trips")} />}
         {tab === "packing" && <PackingPanel trip={trip} onChange={commit} readOnly={readOnly} shared={shared} />}

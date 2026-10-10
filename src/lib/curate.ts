@@ -466,7 +466,11 @@ export function withBookedCosts(est: BudgetBreakdown, trip: Pick<Trip, "flights"
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): BudgetBreakdown {
+/**
+ * Estimate the trip's costs. `farePerAdultUSD` (a recently seen real fare, when the traveller chose
+ * to use one) replaces the distance-based return fare.
+ */
+export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[], farePerAdultUSD?: number): BudgetBreakdown {
   const tier = req.budgetTier;
   const adults = Math.max(1, req.adults);
   const ages = childAges(req);
@@ -480,7 +484,7 @@ export function estimateBudget(req: TripRequest, legs: Leg[], days: Day[]): Budg
   const transfers = Math.max(0, legs.length - 1) * 80 * people;
   const localTransport = days.reduce((s, d) => s + legOf(d.city).destination.daily[tier].transport * share((a) => (a < 4 ? 0 : a <= 12 ? 0.5 : 0.8)), 0) + transfers;
   const activities = days.reduce((s, d) => s + d.activities.reduce((t, a) => t + a.estCost, 0), 0) * share((a) => (a < 4 ? 0 : a <= 12 ? 0.5 : 0.8));
-  const fare = req.origin.trim() ? returnFareUSD(req.origin, legs) : 0;
+  const fare = !req.origin.trim() ? 0 : farePerAdultUSD && farePerAdultUSD > 0 ? farePerAdultUSD : returnFareUSD(req.origin, legs);
   const flights = fare * FLIGHT_MULTIPLIER[tier] * share((a) => (a < 2 ? 0.1 : a <= 11 ? 0.75 : 1));
 
   const out = {
@@ -656,7 +660,7 @@ export function blankTrip(input: TripRequest, opts: CurateOptions = {}): Trip {
 /** Recompute derived totals after the traveller edits the itinerary. */
 export function recalcBudget(trip: Trip): Trip {
   const legs = planLegs(trip.request);
-  return { ...trip, budget: withBookedCosts(estimateBudget(trip.request, legs, trip.days), trip, legs) };
+  return { ...trip, budget: withBookedCosts(estimateBudget(trip.request, legs, trip.days, trip.fareQuote?.perAdultUSD), trip, legs) };
 }
 
 /** Catalog alternatives for a slot, excluding anything already in the trip. */

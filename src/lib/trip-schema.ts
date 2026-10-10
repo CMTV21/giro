@@ -122,6 +122,7 @@ export const TripSchema = z.object({
   flights: z.array(FlightSchema).max(12).optional(),
   parked: z.array(ActivitySchema.extend({ city: str(80), reason: str(200).optional() })).max(100).optional(),
   advisorySeen: z.record(z.string().regex(/^[A-Z]{2}$/), z.number().int().min(0).max(3)).refine((r) => Object.keys(r).length <= 12).optional(),
+  fareQuote: z.object({ perAdultUSD: usd, seenAt: str(30), from: str(8), to: str(8), airline: str(60).optional() }).optional(),
   food: z
     .array(
       z.object({

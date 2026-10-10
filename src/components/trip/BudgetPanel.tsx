@@ -2,6 +2,7 @@
 
 import { Info, Wallet } from "lucide-react";
 import { useState } from "react";
+import { formatDate } from "@/lib/dates";
 import { formatLocal } from "@/lib/currency";
 import { tripFx } from "@/lib/money";
 import type { Trip } from "@/lib/types";
@@ -37,6 +38,7 @@ export function BudgetPanel({ trip }: { trip: Trip }) {
   const pricedStays = trip.stays.filter((s) => s.booking?.paid).length;
   const noteFor = (key: Key, fallback: string) => {
     if (key === "flights" && t.booked?.flights !== undefined) return "What you paid for your booked flights.";
+    if (key === "flights" && trip.fareQuote) return `Based on a ${trip.fareQuote.from}–${trip.fareQuote.to} fare seen ${formatDate(trip.fareQuote.seenAt, { month: "short", day: "numeric" })}${trip.request.budgetTier === "luxury" ? ", scaled up for business class" : ""}.`;
     if (key === "lodging" && t.booked?.lodging !== undefined)
       return pricedStays === trip.stays.length ? "What you paid for your stays." : `What you paid for ${pricedStays} of ${trip.stays.length} stays, plus estimates for the rest.`;
     return fallback;

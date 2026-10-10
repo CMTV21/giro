@@ -156,6 +156,8 @@ export function rescheduleTrip(trip: Trip, start: string, end: string, taste?: T
     days,
     stays,
     parked: [...(trip.parked ?? []), ...parked],
+    // A fare seen for the old dates no longer applies.
+    fareQuote: undefined,
   };
   return { trip: { ...next, budget: withBookedCosts(estimateBudget(req, legs, days), next, legs) }, parked, addedDays, warnings };
 }

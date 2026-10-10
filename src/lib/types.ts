@@ -191,6 +191,8 @@ export interface Trip {
   parked?: ParkedIdea[];
   /** Government of Canada advisory level last shown per country (ISO), to flag increases. */
   advisorySeen?: Record<string, number>;
+  /** A real fare the traveller chose as the flight estimate (cheapest return per adult, USD). */
+  fareQuote?: { perAdultUSD: number; seenAt: string; from: string; to: string; airline?: string };
   /** Giro AI's dishes and restaurants for cities outside the curated catalog. */
   food?: Omit<CityFood, "source">[];
 }

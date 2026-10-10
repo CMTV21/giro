@@ -27,6 +27,7 @@ Giro turns a few details (where, when, who, what you love, budget) into a day-by
 | | **Eat & drink**: must-try dishes and hand-picked restaurants for all 26 catalog cities (Giro AI writes one for other cities), with live Tripadvisor rankings and one-tap "add to a day" at the right meal |
 | | **Opening hours and real travel times**: warnings when a stop is closed or closes before you leave, and measured walking or ride times between stops that the schedule, board and calendar all use |
 | | **Real tours**: bookable stops show a matched Viator tour with its rating, reviews, price and free cancellation, booked through tracked links |
+| | **Real fares**: the cheapest return fare seen recently for your dates, a cheaper date nearby, and one tap to use it as the budget's flight estimate |
 | | **Forward your bookings**: each trip has an email address; forwarded confirmations are read and added (from members at once, from others after approval) |
 | | **Official travel advice**: Government of Canada advisory level for every country on a trip and on guides, with a "raised since you last looked" flag |
 | | **Live calendar**: subscribe in Google, Apple or Outlook Calendar and it follows every change to the plan; links can be switched off and replaced |
@@ -58,6 +59,7 @@ Configuration lives in `.env.local` (see `.env.example`). Everything is optional
 | `GOOGLE_PLACES_API_KEY` | Opening hours for sights and restaurants (Google Places API (New), Text Search; restrict the key to that API). Each place is looked up at most monthly. Off when unset. |
 | `STADIA_API_KEY` | Real walking and ride times between stops (Stadia Maps routing). A server-side API key, separate from the domain-based tile access. Each pair is cached 90 days. Off when unset. |
 | `VIATOR_API_KEY` | Real tours on bookable stops (Viator Partner API, affiliate access): rating, review count, from-price in the trip currency, free cancellation. Matches must share a distinctive word with the stop; cached weekly. Off when unset. |
+| `TRAVELPAYOUTS_TOKEN` / `NEXT_PUBLIC_TRAVELPAYOUTS_MARKER` | Recently seen airfares (Travelpayouts Aviasales data API) on the Book tab, a cheaper-nearby-date tip, and "use as flight estimate"; the marker tags Aviasales links for commission. Cached 6 hours per route and month. Off when unset. |
 | `INBOUND_SECRET` / `INBOUND_ADDRESS` | Forward-your-bookings email: a shared secret with the Cloudflare Email Worker, and the base address (e.g. `trips@girotrips.com`). Setup steps in `workers/inbound-email/README.md`. Off until both are set. |
 | `CONTACT_EMAIL` | Privacy and legal contact shown on `/privacy`, `/terms` and `/affiliate-disclosure` (redeploy after changing). |
 

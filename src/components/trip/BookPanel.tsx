@@ -5,11 +5,12 @@ import { money, tripFx } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
 import { resolveDestination } from "@/lib/curate";
 import type { Trip } from "@/lib/types";
+import { FareCard } from "./FareCard";
 
 /** Nightly price caps (USD) passed to stay searches, converted to the trip currency. */
 const STAY_FILTER: Record<Trip["request"]["budgetTier"], number | undefined> = { shoestring: 150, comfort: 350, luxury: undefined };
 
-export function BookPanel({ trip }: { trip: Trip }) {
+export function BookPanel({ trip, readOnly = true, onChange }: { trip: Trip; readOnly?: boolean; onChange?: (t: Trip, message: string) => void }) {
   const req = trip.request;
   const fx = tripFx(trip);
   const cap = STAY_FILTER[req.budgetTier];
@@ -32,6 +33,7 @@ export function BookPanel({ trip }: { trip: Trip }) {
   return (
     <div className="space-y-10">
       <Group icon={<Plane className="h-5 w-5" />} title="Flights" subtitle={req.origin ? `For ${describeParty(req)}, dates pre-filled.` : "Add a departure city in the planner to search flights."}>
+        <FareCard trip={trip} readOnly={readOnly || !onChange} onUse={(t, m) => onChange?.(t, m)} />
         {links.flights.length ? (
           links.flights.map((g) => (
             <div key={g.title} className="space-y-3">
