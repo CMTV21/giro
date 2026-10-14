@@ -4,7 +4,7 @@
 
 Giro (girotrips.com) is a Canadian AI trip planner: day-by-day itineraries, multi-city, CAD by default,
 affiliate booking links, group trips (voting, shared expenses), public SEO trip guides. Pre-launch.
-Owner: Chris (cmtv21). Read README.md for the feature table and every environment variable.
+Owner: GitHub cmtv21. Read README.md for the feature table and every environment variable.
 
 ## Working rules (from the owner)
 - Never ask for secrets in chat; they go in Vercel environment variables, set by the owner.
