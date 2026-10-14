@@ -1,19 +1,29 @@
 import "server-only";
 import { normalizeCity } from "../lib/destinations.ts";
 import { parseGoogleHours, type OpeningHours } from "../lib/hours.ts";
+import { takeMonthlyQuota } from "./cache.ts";
 import { getDb } from "./db.ts";
 
 /**
  * Opening hours from Google Places (New) Text Search. Each place is looked up at most once a
- * month (a miss is retried after a week), so cost stays low. Off unless GOOGLE_PLACES_API_KEY is set.
+ * month (a miss is retried after a week), and lookups stop for the rest of the month after
+ * GOOGLE_PLACES_MONTHLY_CAP calls (default 900, inside Google's free monthly allowance).
+ * Off unless GOOGLE_PLACES_API_KEY is set.
  */
 
 export const hoursEnabled = () => Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim());
 
 const FRESH_DAYS = 30;
 const MISS_DAYS = 7;
+const DEFAULT_MONTHLY_CAP = 900;
 const ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
 const FIELDS = "places.id,places.displayName,places.businessStatus,places.regularOpeningHours,places.googleMapsUri";
+
+export function monthlyCap(): number {
+  const raw = process.env.GOOGLE_PLACES_MONTHLY_CAP?.trim();
+  const n = raw ? Number(raw) : DEFAULT_MONTHLY_CAP;
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_MONTHLY_CAP;
+}
 
 export const hoursKey = (title: string, city: string) => `${normalizeCity(title)}|${normalizeCity(city)}`.slice(0, 240);
 
@@ -47,6 +57,7 @@ export async function lookupHours(title: string, city: string, get: Fetcher = fe
   const cachedHours = row?.hours ? ((typeof row.hours === "string" ? JSON.parse(row.hours) : row.hours) as OpeningHours) : undefined;
   if (row && Number(row.age_days) < (cachedHours ? FRESH_DAYS : MISS_DAYS)) return { hours: cachedHours, mapsUrl: row.maps_url ?? undefined };
   if (!hoursEnabled()) return { hours: cachedHours };
+  if (!(await takeMonthlyQuota("google-places", monthlyCap()))) return { hours: cachedHours, mapsUrl: row?.maps_url ?? undefined };
   try {
     const found = await fetchGoogle(title, city, get);
     await db.query(

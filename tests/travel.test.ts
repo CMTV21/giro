@@ -4,6 +4,7 @@ import { curateTrip } from "../src/lib/curate.ts";
 import { scheduleDay, travelLabel, travelMinutes } from "../src/lib/schedule.ts";
 import { chainsOf, hopsOf, routable, withTravel } from "../src/lib/travel.ts";
 import type { TripRequest } from "../src/lib/types.ts";
+import { getDb } from "../src/server/db.ts";
 import { lookupHours } from "../src/server/hours.ts";
 import { MAX_WALK_MINUTES, RIDE_BUFFER_MINUTES, routeLegs } from "../src/server/routing.ts";
 
@@ -65,6 +66,25 @@ test("opening hours: looked up once, cached, and safe without a key", async () =
   assert.deepEqual(again.hours, first.hours);
   const failing = await lookupHours("Nowhere Museum", "Lisbon", async () => json({}, 500));
   assert.equal(failing.hours, undefined, "provider errors don't break anything");
+  delete process.env.GOOGLE_PLACES_API_KEY;
+});
+
+test("opening hours: a monthly cap stops paid lookups", async () => {
+  process.env.GOOGLE_PLACES_API_KEY = "test-key";
+  process.env.GOOGLE_PLACES_MONTHLY_CAP = "2";
+  await (await getDb()).query("delete from api_usage");
+  let calls = 0;
+  const fake = async () => {
+    calls++;
+    return json({ places: [] });
+  };
+  for (const name of ["Cap Museum A", "Cap Museum B", "Cap Museum C", "Cap Museum D"]) await lookupHours(name, "Porto", fake);
+  assert.equal(calls, 2, "no calls past the cap");
+  assert.deepEqual(await lookupHours("Cap Museum E", "Porto", fake), { hours: undefined, mapsUrl: undefined });
+  process.env.GOOGLE_PLACES_MONTHLY_CAP = "0";
+  await lookupHours("Cap Museum F", "Porto", fake);
+  assert.equal(calls, 2, "a cap of 0 switches lookups off");
+  delete process.env.GOOGLE_PLACES_MONTHLY_CAP;
   delete process.env.GOOGLE_PLACES_API_KEY;
 });
 

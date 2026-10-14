@@ -20,3 +20,21 @@ export async function cached<T>(key: string, maxAgeMinutes: number, load: () => 
     return stale;
   }
 }
+
+/**
+ * Claims one call against a provider's monthly budget. Returns false (and counts nothing) once
+ * `cap` calls have been made this UTC month. The check and increment are one statement, so
+ * concurrent requests can't overshoot.
+ */
+export async function takeMonthlyQuota(provider: string, cap: number): Promise<boolean> {
+  if (!(cap > 0)) return false;
+  const db = await getDb();
+  const month = new Date().toISOString().slice(0, 7);
+  const rows = await db.query(
+    `insert into api_usage (provider, month, calls) values ($1, $2, 1)
+     on conflict (provider, month) do update set calls = api_usage.calls + 1 where api_usage.calls < $3
+     returning calls`,
+    [provider, month, cap],
+  );
+  return rows.length > 0;
+}

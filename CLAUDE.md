@@ -50,6 +50,7 @@ Owner: GitHub cmtv21. Read README.md for the feature table and every environment
   AeroDataBox field names were built from partial docs).
 - Not built: GetYourGuide API (needs approval), live hotel rates (Booking/Expedia approval), insurance links (legal).
 - Open items: lawyer review, CIPO trademark check, Quebec Law 25 readiness, Neon storage limits for receipts,
-  optional Google Places monthly cap, traveller tips / "Publish your trip".
+  traveller tips / "Publish your trip". Google Places is capped monthly (`GOOGLE_PLACES_MONTHLY_CAP`, default 900).
 - Strategy: market research in the owner's reports (AI trip planner competitive landscape). Positioning: group
-  trips abroad for Canadians; per-trip "Group Trip Pass" pricing idea; 90-day go/no-go launch metrics.
+  trips abroad for Canadians; per-trip "Group Trip Pass" pricing idea. 90-day plan with go/no-go metrics:
+  `docs/LAUNCH-90-DAY.md` (week-0 gaps: anonymous trip_planned counter, pass_events table).

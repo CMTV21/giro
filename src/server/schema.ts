@@ -193,4 +193,13 @@ export const MIGRATIONS: string[][] = [
       fetched_at timestamptz not null default now()
     )`,
   ],
+  [
+    // Paid-provider calls per calendar month (UTC), so free tiers are never exceeded.
+    `create table api_usage (
+      provider text not null,
+      month text not null,
+      calls integer not null default 0,
+      primary key (provider, month)
+    )`,
+  ],
 ];
