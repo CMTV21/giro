@@ -1,4 +1,4 @@
-import type { Activity, Day, Trip } from "./types.ts";
+import type { Activity, Day, TravelLeg, Trip } from "./types.ts";
 
 /** Measured travel between stops: which pairs to measure, and saving the results on the trip. */
 
@@ -32,7 +32,7 @@ export const routable = (a: Activity) => a.category !== "transit" && !(a.categor
  * Record measured hops (by the destination stop's id). Returns the same trip object when nothing
  * meaningfully changed, so callers can skip saving.
  */
-export function withTravel(trip: Trip, measured: Map<string, { from: string; mins: number; mode: "walk" | "ride" }>): Trip {
+export function withTravel(trip: Trip, measured: Map<string, TravelLeg>): Trip {
   let changed = false;
   const days = trip.days.map((d) => {
     let dayChanged = false;
@@ -40,7 +40,7 @@ export function withTravel(trip: Trip, measured: Map<string, { from: string; min
       const m = measured.get(a.id);
       if (!m) return a;
       const t = a.travel;
-      if (t && t.from === m.from && t.mode === m.mode && Math.abs(t.mins - m.mins) < 2) return a;
+      if (t && t.from === m.from && t.mode === m.mode && Math.abs(t.mins - m.mins) < 2 && Boolean(t.est) === Boolean(m.est)) return a;
       dayChanged = true;
       return { ...a, travel: m };
     });

@@ -12,14 +12,16 @@ import { lovedLabel, useCommunity, type CommunityPicks } from "@/lib/community-c
 import { newId, suggestAlternatives } from "@/lib/curate";
 import { formatDate } from "@/lib/dates";
 import { money, tripFx } from "@/lib/money";
-import { clock, dayWindow, scheduleDay, toMinutes, travelLabel, type ScheduledItem } from "@/lib/schedule";
-import { hopsOf } from "@/lib/travel";
+import { hopAdvice } from "@/lib/getting-around";
+import { clock, dayWindow, scheduleDay, toMinutes, type ScheduledItem } from "@/lib/schedule";
+import { hopsOf, routable } from "@/lib/travel";
 import type { VoteTally } from "@/lib/storage";
 import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Activity, Day, Slot, Trip } from "@/lib/types";
 import { applyStopEdit, customStop, draftFrom, emptyDraft, placeBySlot } from "@/lib/plan-edit";
 import { ActivityCard, DragHandle } from "./ActivityCard";
 import { StopEditor } from "./StopEditor";
+import { TravelHop } from "./TravelHop";
 
 export interface DayGroupProps {
   votes?: Record<string, VoteTally>;
@@ -101,10 +103,13 @@ export function DayPlan({
               if (item.kind === "meal") return <MealRow key={`${item.label}-${item.start}`} item={item} eat={day.eat} />;
               if (item.kind === "flight") return <FlightRow key={`f-${item.start}-${item.label}`} item={item} />;
               const a = item.activity!;
+              const from = fromOf.get(a.id);
+              const hop = from && routable(from) && routable(a) ? hopAdvice(from, a, day.city, item.start) : undefined;
               return (
                 <SortableStop key={a.id} id={a.id} dayIndex={day.index} disabled={readOnly}>
                   {(handle) => (
                     <>
+                      {hop && <TravelHop hop={hop} />}
                       <ActivityCard
                         activity={a}
                         city={day.city}
@@ -114,7 +119,6 @@ export function DayPlan({
                         loved={a.ref ? community[a.ref] : undefined}
                         caution={accessCaution(effortOf({ key: a.ref ?? "", hrs: a.durationHrs }), trip.request.access)}
                         hours={hoursOf?.(a, day, timed.get(a.id))}
-                        arrive={travelLabel(fromOf.get(a.id), a)}
                         handle={handle}
                         extra={a.category !== "transit" && a.category !== "free" ? renderExtra?.(a, day.city) : undefined}
                         actions={{

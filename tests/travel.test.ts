@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { curateTrip } from "../src/lib/curate.ts";
 import { scheduleDay, travelLabel, travelMinutes } from "../src/lib/schedule.ts";
+import { cityTransit, distanceKm, estimateLeg, hopAdvice } from "../src/lib/getting-around.ts";
 import { chainsOf, hopsOf, routable, withTravel } from "../src/lib/travel.ts";
-import type { TripRequest } from "../src/lib/types.ts";
+import type { Activity, TripRequest } from "../src/lib/types.ts";
 import { getDb } from "../src/server/db.ts";
 import { lookupHours } from "../src/server/hours.ts";
 import { MAX_WALK_MINUTES, RIDE_BUFFER_MINUTES, routeLegs } from "../src/server/routing.ts";
@@ -111,4 +112,64 @@ test("routing: walks short hops, rides long ones, caches pairs", async () => {
   assert.equal(bodies.length, n);
   assert.deepEqual(await routeLegs([{ lat: 999, lon: 0 }, pts[0]], fake), [], "bad points rejected");
   delete process.env.STADIA_API_KEY;
+});
+
+const stop = (id: string, extra: Partial<Activity> = {}): Activity => ({ id, title: `Stop ${id}`, description: "", category: "culture", slot: "morning", durationHrs: 1, estCost: 0, ...extra });
+
+test("getting around: estimates from distance walk short hops and ride long ones", () => {
+  const baixa = { lat: 38.7107, lon: -9.1366 };
+  const chiado = { lat: 38.7105, lon: -9.1425 };
+  const belem = { lat: 38.6916, lon: -9.2160 };
+  assert.ok(Math.abs(distanceKm(baixa, belem) - 7.2) < 0.3);
+  const near = estimateLeg(baixa, chiado);
+  assert.equal(near.mode, "walk");
+  assert.ok(near.mins >= 5 && near.mins <= 12, `walk ${near.mins}`);
+  const far = estimateLeg(baixa, belem);
+  assert.equal(far.mode, "ride");
+  assert.ok(far.km > 9 && far.km < 10);
+});
+
+test("getting around: picks walk, the city's transit, or a taxi", () => {
+  const a = stop("a");
+  const walk = hopAdvice(a, stop("b", { travel: { from: "a", mins: 9, mode: "walk", km: 0.7 } }), "Lisbon");
+  assert.deepEqual([walk.mode, walk.label, walk.alt, walk.estimated], ["walk", "~9 min walk", undefined, false]);
+  assert.match(walk.directionsUrl, /travelmode=walking/);
+
+  const longWalk = hopAdvice(a, stop("b", { travel: { from: "a", mins: 28, mode: "walk", km: 2.2 } }), "Paris");
+  assert.equal(longWalk.mode, "walk");
+  assert.match(longWalk.alt ?? "", /^or ~\d+ min by (Métro|taxi)$/);
+
+  const ride = { travel: { from: "a", mins: 25, mode: "ride" as const, km: 7, est: true } };
+  const paris = hopAdvice(a, stop("b", ride), "Paris", 14 * 60);
+  assert.deepEqual([paris.mode, paris.estimated], ["transit", true]);
+  assert.match(paris.label, /by Métro$/);
+  assert.match(paris.directionsUrl, /travelmode=transit/);
+  assert.match(hopAdvice(a, stop("b", ride), "Bali").label, /^~25 min by Grab/);
+  assert.equal(hopAdvice(a, stop("b", ride), "Paris", 23 * 60 + 30).mode, "taxi", "late at night, take a car");
+  const dayTrip = hopAdvice(a, stop("b", { travel: { from: "a", mins: 76, mode: "ride", km: 24.8, est: true } }), "Paris", 15 * 60);
+  assert.deepEqual([dayTrip.mode, dayTrip.label, dayTrip.alt], ["transit", "~60 min by Métro", undefined], "long hops ride faster lines");
+  assert.equal(cityTransit("Reykjavík").transit, undefined, "accents still match the city");
+  assert.equal(cityTransit("Montréal").transit, "Métro");
+  assert.equal(cityTransit("Somewhere New").transit, "public transport");
+});
+
+test("getting around: without a leg, the neighbourhood decides; stale legs are ignored", () => {
+  const same = hopAdvice(stop("a", { area: "Alfama" }), stop("b", { area: "Alfama" }), "Lisbon");
+  assert.deepEqual([same.mode, same.label, same.estimated], ["walk", "~15 min walk", true]);
+  const across = hopAdvice(stop("a", { area: "Alfama" }), stop("b", { area: "Belém" }), "Lisbon");
+  assert.equal(across.mode, "transit");
+  const stale = hopAdvice(stop("a"), stop("b", { travel: { from: "x", mins: 3, mode: "walk" } }), "Marrakech");
+  assert.equal(stale.mode, "taxi", "a leg from a different previous stop doesn't count");
+  assert.match(stale.directionsUrl, /origin=Stop\+a%2C\+Marrakech/);
+});
+
+test("getting around: a measured leg replaces an estimate of the same length", () => {
+  const trip = curateTrip(req);
+  const target = trip.days[1].activities[1];
+  const from = trip.days[1].activities[0].id;
+  const est = withTravel(trip, new Map([[target.id, { from, mins: 12, mode: "walk" as const, km: 1, est: true }]]));
+  assert.notEqual(est, trip);
+  const measured = withTravel(est, new Map([[target.id, { from, mins: 12, mode: "walk" as const, km: 1 }]]));
+  assert.notEqual(measured, est, "the estimate flag alone is a change worth saving");
+  assert.equal(measured.days[1].activities[1].travel?.est, undefined);
 });

@@ -34,7 +34,7 @@ Owner: GitHub cmtv21. Read README.md for the feature table and every environment
 
 ## Map of the code
 - Engine: `src/lib/curate.ts` (curateTrip, budget, recalcBudget), `schedule.ts` (clock times, travelMinutes),
-  `plan-edit.ts`, `board.ts` (placeAtTime), `reschedule.ts`, `bookings.ts` (mergeBooking), `trip-schema.ts` (zod),
+  `plan-edit.ts`, `getting-around.ts` (travel between stops: walk / city transit / taxi, distance estimates), `board.ts` (placeAtTime), `reschedule.ts`, `bookings.ts` (mergeBooking), `trip-schema.ts` (zod),
   `types.ts`, catalog `destinations.ts` (26 cities), `src/data/` (food, heads-up).
 - Server: `src/server/*` (auth, trips, links, inbound email, hours, routing, tours, fares, events, flight-status,
   advisories, geo, cache). API routes in `src/app/api/*`; calendar feed `src/app/cal/[file]`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, Footprints, TrainFront, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
+import { ArchiveRestore, Ban, CircleCheck, Clock, ExternalLink, TrainFront, GripVertical, Lightbulb, MapPin, Pencil, Pin, Shuffle, Star, StickyNote, ThumbsDown, ThumbsUp, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { experienceLinks, mapsSearchUrl, reviewsLink, trackedHref, transferLink } from "@/lib/booking";
 import type { FxSnapshot } from "@/lib/currency";
@@ -44,7 +44,6 @@ export function ActivityCard({
   time,
   caution,
   hours,
-  arrive,
   loved,
   handle,
   extra,
@@ -60,7 +59,6 @@ export function ActivityCard({
   /** Opening hours for the visit's date, with a warning when the plan doesn't fit them. */
   hours?: { label: string; issue?: string; mapsUrl?: string };
   /** How you get here from the previous stop, when measured ("~12 min walk"). */
-  arrive?: string;
   /** Community pick: how many travellers backed this stop. */
   loved?: { travellers: number };
   /** Drag handle (supplied by the sortable wrapper). */
@@ -139,7 +137,6 @@ export function ActivityCard({
           {!isFree && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{a.durationHrs}h</span>}
           {!isTransit && !isFree && <span>{a.estCost ? formatMoney(a.estCost, fx, { approx: true }) : "Free"}</span>}
           {a.booked && <span className="inline-flex items-center gap-1 text-sea"><CircleCheck className="h-3.5 w-3.5" /> Booked</span>}
-          {arrive && <span className="inline-flex items-center gap-1" title="From the previous stop"><Footprints className="h-3.5 w-3.5" /> {arrive}</span>}
           {loved && <span className="inline-flex items-center gap-1 text-sky-800" title="Booked, picked or voted up by this many Giro travellers"><Users className="h-3.5 w-3.5" /> Loved by {loved.travellers} travellers</span>}
           {handle && !actions.readOnly && <span className="no-print ml-auto">{handle}</span>}
         </div>
