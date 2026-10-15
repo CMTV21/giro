@@ -11,6 +11,7 @@ import type { VoteTally } from "@/lib/storage";
 import type { Activity } from "@/lib/types";
 import { CATEGORY_META } from "../meta";
 import { PlacePhoto } from "./PlacePhoto";
+import { openDetails } from "./StopDetails";
 
 export interface ActivityTime {
   start: number;
@@ -160,7 +161,7 @@ export function ActivityCard({
             <h4 className="text-[17px] leading-snug font-semibold">{a.title}</h4>
             {a.description && a.description !== "Added by you." && <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{a.description}</p>}
           </div>
-          {!isTransit && !isFree && <PlacePhoto title={a.title} city={city} durationHrs={a.durationHrs} query={{ strict: restaurant }} className="mt-0.5 h-20 w-24 sm:h-24 sm:w-32" />}
+          {!isTransit && !isFree && <PlacePhoto title={a.title} city={city} durationHrs={a.durationHrs} query={{ strict: restaurant }} className="mt-0.5 h-20 w-24 sm:h-24 sm:w-32" onOpen={() => openDetails(a.id)} />}
         </div>
         {a.note && (
           <p className="mt-2.5 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm whitespace-pre-line text-amber-950">

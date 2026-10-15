@@ -11,9 +11,21 @@ import type { Activity, Trip } from "@/lib/types";
 import { PlaceFacts } from "./PlaceFacts";
 import { photoCredit } from "./PlacePhoto";
 
+const OPEN_EVENT = "giro:open-details";
+
+/** Open the details panel for a stop or idea (e.g. when its photo is clicked). */
+export function openDetails(activityId: string) {
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: activityId }));
+}
+
 /** The "Details" button on a stop or idea, and the panel it opens. */
 export function StopDetails({ activity, city, trip, className = "" }: { activity: Activity; city: string; trip: Pick<Trip, "fx">; className?: string }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = (e: Event) => (e as CustomEvent<string>).detail === activity.id && setOpen(true);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, [activity.id]);
   if (activity.category === "transit" || (activity.category === "free" && !activity.area)) return null;
   return (
     <>
@@ -59,7 +71,7 @@ function DetailsDialog({ activity: a, city, trip, onClose }: { activity: Activit
         return;
       }
       const w: PlaceInfo = await placeInfo({ title: place, durationHrs: a.durationHrs }, city);
-      if (live) setPhotos(w.thumbnail ? [{ src: w.thumbnail, credit: photoCredit(w.photo), href: w.photo?.page ?? w.url, google: false }] : []);
+      if (live) setPhotos(w.thumbnail ? [{ src: w.thumbnail, credit: photoCredit(w.photo).replace(/^Photo: /, ""), href: w.photo?.page ?? w.url, google: false }] : []);
     })();
     fetch(`/api/place/details?${new URLSearchParams({ title: place, city })}`)
       .then((r) => (r.ok ? r.json() : {}))

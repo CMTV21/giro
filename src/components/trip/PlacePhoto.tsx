@@ -13,7 +13,6 @@ export function photoCredit(photo?: PhotoCredit): string {
 interface Shown {
   src: string;
   alt: string;
-  href?: string;
   credit: string;
   title: string;
 }
@@ -21,13 +20,12 @@ interface Shown {
 const fromGoogle = (g: GooglePhoto, alt: string): Shown => ({
   src: g.src,
   alt,
-  href: g.authorUrl,
   credit: g.author ? `${g.author} · Google Maps` : "Google Maps",
   title: g.author ? `Photo: ${g.author} (Google Maps)` : "Photo from Google Maps",
 });
 
 const fromWiki = (info: PlaceInfo, alt: string): Shown | undefined =>
-  info.thumbnail ? { src: info.thumbnail, alt: info.title ?? alt, href: info.photo?.page ?? info.url, credit: info.photo?.author ?? "Wikimedia Commons", title: photoCredit(info.photo) } : undefined;
+  info.thumbnail ? { src: info.thumbnail, alt: info.title ?? alt, credit: info.photo?.author ?? "Wikimedia Commons", title: photoCredit(info.photo) } : undefined;
 
 /**
  * A place's photo, fetched only when the element scrolls near the viewport so a long itinerary
@@ -44,6 +42,7 @@ export function PlacePhoto({
   durationHrs = 2,
   source = "google",
   width = 480,
+  onOpen,
 }: {
   title: string;
   city: string;
@@ -54,6 +53,8 @@ export function PlacePhoto({
   /** "wiki" skips Google, for things that aren't a single place (a dish, a neighbourhood). */
   source?: "google" | "wiki";
   width?: number;
+  /** What a click on the photo does, e.g. open the stop's details panel. Without it the photo isn't clickable. */
+  onOpen?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Shown | null>();
@@ -95,13 +96,13 @@ export function PlacePhoto({
   if (shown === null || failed) return <div ref={ref} hidden />;
   return (
     <div ref={ref} className={`relative shrink-0 overflow-hidden bg-sand ${rounded} ${className} ${shown ? "" : "animate-pulse"}`}>
-      {shown && <PhotoImage shown={shown} onError={() => setFailed(true)} />}
+      {shown && <PhotoImage shown={shown} onOpen={onOpen} onError={() => setFailed(true)} />}
     </div>
   );
 }
 
 /** The image with its credit on it (CC licences and Google both require attribution). */
-function PhotoImage({ shown, onError }: { shown: Shown; onError: () => void }) {
+function PhotoImage({ shown, onOpen, onError }: { shown: Shown; onOpen?: () => void; onError: () => void }) {
   const img = (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -109,8 +110,9 @@ function PhotoImage({ shown, onError }: { shown: Shown; onError: () => void }) {
       <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pt-3 pb-0.5 text-[9px] leading-tight text-white/90">{shown.credit}</span>
     </>
   );
-  return shown.href ? (
-    <a href={shown.href} target="_blank" rel="noopener noreferrer" title={shown.title} className="block h-full w-full">{img}</a>
+  // The photographer's profile link lives in the details panel's credit, not on small thumbnails.
+  return onOpen ? (
+    <button type="button" onClick={onOpen} title={`${shown.title}. Open details and more photos`} aria-label={`More photos and details: ${shown.alt}`} className="block h-full w-full cursor-zoom-in">{img}</button>
   ) : (
     <span title={shown.title} className="block h-full w-full">{img}</span>
   );
