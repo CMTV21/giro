@@ -11,6 +11,9 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap", axes: ["opsz"] });
 
+/** Travelpayouts Drive: verifies the site with Travelpayouts and tags supported partner links. */
+const TRAVELPAYOUTS_DRIVE = "https://emrldtp.com/NTg2MDU3.js?t=586057";
+
 const DESCRIPTION =
   "Tell Giro where and when. Get a day-by-day itinerary curated to your style, with flights, stays and experiences ready to book on Google Flights, Airbnb, Booking.com and Expedia.";
 
@@ -28,6 +31,9 @@ export const viewport: Viewport = { themeColor: "#faf9f6" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${fraunces.variable}`}>
+      <head>
+        <script async src={TRAVELPAYOUTS_DRIVE} data-cmp-ab="2" />
+      </head>
       <body className="flex min-h-dvh flex-col">
         <SessionProvider>
           <SiteHeader />

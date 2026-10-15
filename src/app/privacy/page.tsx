@@ -47,7 +47,11 @@ export default function PrivacyPage() {
         <li><strong>Anthropic</strong>: Giro AI, only when you use it.</li>
         <li><strong>Resend</strong>: sending account and invite emails.</li>
         <li><strong>Open-Meteo</strong> and <strong>Frankfurter</strong>: weather forecasts and exchange rates. We send only a city or location and currency codes, never your personal information.</li>
-        <li><strong>Wikipedia, Wikimedia Commons</strong> and <strong>OpenStreetMap</strong>: place history, photos, coordinates and map tiles. Our server looks up place names; map tiles load in your browser, so OpenStreetMap sees your IP address, as any website you visit would.</li>
+        <li><strong>Wikipedia, Wikimedia Commons</strong> and <strong>OpenStreetMap</strong>: place history, photos and coordinates. Our server looks up place names.</li>
+        <li><strong>Stadia Maps</strong>: map tiles and travel times between stops. Map tiles load in your browser, so Stadia sees your IP address, as any website you visit would; travel times are looked up by our server using only map coordinates.</li>
+        <li><strong>Google</strong> (Places API): opening hours. Our server sends only a place name and city.</li>
+        <li><strong>Ticketmaster</strong>: events during your trip. Our server sends only a city and dates.</li>
+        <li><strong>Travelpayouts</strong>: an affiliate network. Its script loads in your browser on our pages to attribute bookings on some partner sites (for example Aviasales) to Giro, so it sees your IP address and browser details and may set its own cookies. It doesn&apos;t receive your name, email or trips.</li>
       </ul>
       <p><strong>Travel partners.</strong> When you follow a booking link, you leave Giro for the partner&apos;s site (e.g. Booking.com, Expedia, Airbnb, Google Flights). The link includes your search details (destination, dates, party size, currency) and, for some partners, a click reference code, but not your name or email. The partner&apos;s own privacy policy applies from there.</p>
       <p><strong>Other members of your trips</strong> can see your name, votes and the expenses you add on those trips.</p>
@@ -57,7 +61,7 @@ export default function PrivacyPage() {
       <p>Our service providers store and process information in the United States, so it may be accessible to authorities there under U.S. law.</p>
 
       <h2>6. Cookies and local storage</h2>
-      <p>We use one essential cookie, <code>giro_session</code>, to keep you signed in. We don&apos;t use advertising or third-party tracking cookies. Your browser&apos;s local storage holds trips (when signed out), your Travel DNA and packing checklists. Partner sites may set their own cookies after you visit them.</p>
+      <p>We use one essential cookie, <code>giro_session</code>, to keep you signed in. We don&apos;t use advertising cookies. Our affiliate network, Travelpayouts, may set cookies to attribute bookings to Giro (see section 4). Your browser&apos;s local storage holds trips (when signed out), your Travel DNA and packing checklists. Partner sites may set their own cookies after you visit them.</p>
 
       <h2>7. How long we keep it</h2>
       <p>We keep your account information until you delete your account. Deleting it (Account → Delete account) permanently removes your profile, the trips you own (including for other members of those trips), your trip memberships, votes, expenses you paid, and sessions. Partner click records are kept for commission reconciliation, but are no longer linked to you. Our database provider may hold encrypted backups for a short period before they expire.</p>
