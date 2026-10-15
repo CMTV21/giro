@@ -5,7 +5,7 @@ import { PASS_FREE, PASS_INCLUDES, PASS_PRICE_CAD } from "@/lib/pass";
 
 export const metadata: Metadata = {
   title: "Group Trip Pass",
-  description: `Plan a group trip abroad together: unlimited travellers, voting, shared expenses and receipts, for one C$${PASS_PRICE_CAD} payment per trip.`,
+  description: "Plan a group trip abroad together: unlimited travellers, voting, shared expenses and receipts, all on one trip.",
 };
 
 export default function PassPage() {
@@ -14,7 +14,7 @@ export default function PassPage() {
       <p className="eyebrow">Coming soon</p>
       <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">Group Trip Pass</h1>
       <p className="mt-3 max-w-2xl text-lg text-ink-soft">
-        One payment per trip, made by the organizer, for everything a group needs to plan and pay together. No subscription.
+        Everything a group needs to plan and pay for a trip together, unlocked for the whole trip by the organizer.
       </p>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
@@ -31,7 +31,7 @@ export default function PassPage() {
         <section className="card p-6 ring-2 ring-brand/40" aria-labelledby="pass-title">
           <div className="flex items-baseline justify-between gap-3">
             <h2 id="pass-title" className="flex items-center gap-2 font-display text-2xl font-semibold"><Users className="h-5 w-5 text-brand" /> Group Trip Pass</h2>
-            <p className="font-display text-2xl font-semibold">C${PASS_PRICE_CAD}<span className="text-sm font-normal text-muted"> / trip</span></p>
+            {PASS_PRICE_CAD !== undefined && <p className="font-display text-2xl font-semibold">C${PASS_PRICE_CAD}<span className="text-sm font-normal text-muted"> / trip</span></p>}
           </div>
           <p className="mt-1 text-sm text-muted">Everything free, plus:</p>
           <ul className="mt-5 space-y-3">

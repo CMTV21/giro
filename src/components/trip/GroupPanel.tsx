@@ -40,7 +40,7 @@ export function GroupPanel({ bundle, onChanged, onSaveToAccount, onLeft }: { bun
         <Link href={`/pass?trip=${encodeURIComponent(tripId)}`} className="card flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 text-sm hover:ring-2 hover:ring-brand/30">
           <Ticket className="h-4 w-4 shrink-0 text-brand" />
           <span className="font-semibold">Group Trip Pass</span>
-          <span className="text-ink-soft">Unlimited travellers, voting, shared expenses and receipts for C${PASS_PRICE_CAD} per trip. Free while Giro is in beta.</span>
+          <span className="text-ink-soft">Unlimited travellers, voting, shared expenses and receipts{PASS_PRICE_CAD !== undefined ? ` for C$${PASS_PRICE_CAD} per trip` : ""}. Free while Giro is in beta.</span>
           <span className="ml-auto inline-flex items-center gap-1 font-semibold text-brand">Learn more <ArrowRight className="h-4 w-4" /></span>
         </Link>
       )}

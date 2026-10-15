@@ -1,5 +1,8 @@
-/** Group Trip Pass: one payment per trip, paid by the organizer. Priced in CAD for the launch experiment. */
-export const PASS_PRICE_CAD = 24;
+/**
+ * Group Trip Pass price in CAD, per trip. Unset while pricing is still being decided: no price is
+ * shown anywhere and waitlist sign-ups record 0. Set it (e.g. 24) to show it on /pass and the Group tab.
+ */
+export const PASS_PRICE_CAD: number | undefined = undefined;
 
 /** What stays free, and what the Pass will add when it launches (the beta keeps everything free). */
 export const PASS_FREE = ["Plan any trip, with or without Giro AI", "Share a read-only link", "Invite up to 3 people", "Every booking link and price estimate"];

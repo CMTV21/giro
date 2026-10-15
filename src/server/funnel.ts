@@ -27,9 +27,9 @@ export async function joinWaitlist(input: { email: string; userId?: string; trip
   const email = input.email.trim().toLowerCase();
   const rows = await db.query(
     "insert into pass_waitlist (email, user_id, trip_id, price_cad) values ($1, $2, $3, $4) on conflict (email) do nothing returning email",
-    [email, input.userId ?? null, tripIdOk(input.tripId), PASS_PRICE_CAD],
+    [email, input.userId ?? null, tripIdOk(input.tripId), PASS_PRICE_CAD ?? 0],
   );
-  if (rows.length) await recordEvent("pass_waitlist", input.tripId, { price: PASS_PRICE_CAD });
+  if (rows.length) await recordEvent("pass_waitlist", input.tripId, { price: PASS_PRICE_CAD ?? 0 });
   return rows.length > 0;
 }
 
