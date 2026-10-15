@@ -51,7 +51,7 @@ export default function PrivacyPage() {
         <li><strong>Open-Meteo</strong> and <strong>Frankfurter</strong>: weather forecasts and exchange rates. We send only a city or location and currency codes, never your personal information.</li>
         <li><strong>Wikipedia, Wikimedia Commons</strong> and <strong>OpenStreetMap</strong>: place history, photos and coordinates. Our server looks up place names.</li>
         <li><strong>Stadia Maps</strong>: map tiles and travel times between stops. Map tiles load in your browser, so Stadia sees your IP address, as any website you visit would; travel times are looked up by our server using only map coordinates.</li>
-        <li><strong>Google</strong> (Places API): opening hours. Our server sends only a place name and city.</li>
+        <li><strong>Google</strong> (Google Maps Places): photos, opening hours, ratings and addresses of places. Our server sends only a place name and city. Photos load from Google in your browser, so Google sees your IP address, as any website you visit would. We keep only Google&apos;s ID for each place.</li>
         <li><strong>Ticketmaster</strong>: events during your trip. Our server sends only a city and dates.</li>
         <li><strong>Travelpayouts</strong>: an affiliate network. Its script loads in your browser on our pages to attribute bookings on some partner sites (for example Aviasales) to Giro, so it sees your IP address and browser details and may set its own cookies. It doesn&apos;t receive your name, email or trips.</li>
       </ul>

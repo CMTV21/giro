@@ -5,8 +5,6 @@ import { scheduleDay, travelLabel, travelMinutes } from "../src/lib/schedule.ts"
 import { cityTransit, distanceKm, estimateLeg, hopAdvice } from "../src/lib/getting-around.ts";
 import { chainsOf, hopsOf, routable, withTravel } from "../src/lib/travel.ts";
 import type { Activity, TripRequest } from "../src/lib/types.ts";
-import { getDb } from "../src/server/db.ts";
-import { lookupHours } from "../src/server/hours.ts";
 import { MAX_WALK_MINUTES, RIDE_BUFFER_MINUTES, routeLegs } from "../src/server/routing.ts";
 
 const req: TripRequest = {
@@ -46,48 +44,6 @@ test("measured travel replaces the guess, and only for the same previous stop", 
 });
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-
-test("opening hours: looked up once, cached, and safe without a key", async () => {
-  delete process.env.GOOGLE_PLACES_API_KEY;
-  assert.deepEqual(await lookupHours("Torre de Belém", "Lisbon", async () => { throw new Error("must not call"); }), { hours: undefined });
-  process.env.GOOGLE_PLACES_API_KEY = "test-key";
-  let calls = 0;
-  let sentKey = "";
-  const fake = async (_url: string, init: RequestInit) => {
-    calls++;
-    sentKey = new Headers(init.headers).get("x-goog-api-key") ?? "";
-    return json({ places: [{ businessStatus: "OPERATIONAL", googleMapsUri: "https://maps.google.com/?cid=1", regularOpeningHours: { periods: [{ open: { day: 2, hour: 10, minute: 0 }, close: { day: 2, hour: 17, minute: 30 } }] } }] });
-  };
-  const first = await lookupHours("Torre de Belém", "Lisbon", fake);
-  assert.equal(first.hours?.periods.length, 1);
-  assert.equal(first.mapsUrl, "https://maps.google.com/?cid=1");
-  assert.equal(sentKey, "test-key");
-  const again = await lookupHours("Torre de Belem", "lisbon", fake);
-  assert.equal(calls, 1, "accent and case variants hit the cache");
-  assert.deepEqual(again.hours, first.hours);
-  const failing = await lookupHours("Nowhere Museum", "Lisbon", async () => json({}, 500));
-  assert.equal(failing.hours, undefined, "provider errors don't break anything");
-  delete process.env.GOOGLE_PLACES_API_KEY;
-});
-
-test("opening hours: a monthly cap stops paid lookups", async () => {
-  process.env.GOOGLE_PLACES_API_KEY = "test-key";
-  process.env.GOOGLE_PLACES_MONTHLY_CAP = "2";
-  await (await getDb()).query("delete from api_usage");
-  let calls = 0;
-  const fake = async () => {
-    calls++;
-    return json({ places: [] });
-  };
-  for (const name of ["Cap Museum A", "Cap Museum B", "Cap Museum C", "Cap Museum D"]) await lookupHours(name, "Porto", fake);
-  assert.equal(calls, 2, "no calls past the cap");
-  assert.deepEqual(await lookupHours("Cap Museum E", "Porto", fake), { hours: undefined, mapsUrl: undefined });
-  process.env.GOOGLE_PLACES_MONTHLY_CAP = "0";
-  await lookupHours("Cap Museum F", "Porto", fake);
-  assert.equal(calls, 2, "a cap of 0 switches lookups off");
-  delete process.env.GOOGLE_PLACES_MONTHLY_CAP;
-  delete process.env.GOOGLE_PLACES_API_KEY;
-});
 
 test("routing: walks short hops, rides long ones, caches pairs", async () => {
   delete process.env.STADIA_API_KEY;

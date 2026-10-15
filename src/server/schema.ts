@@ -221,4 +221,14 @@ export const MIGRATIONS: string[][] = [
       created_at timestamptz not null default now()
     )`,
   ],
+  [
+    // Google's Places policies allow storing only place IDs: keep those, and delete the stored
+    // opening hours and Maps links (now fetched live).
+    `create table place_ids (
+      key text primary key,
+      place_id text,
+      fetched_at timestamptz not null default now()
+    )`,
+    `drop table place_hours`,
+  ],
 ];

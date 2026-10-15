@@ -124,3 +124,11 @@ test("Giro AI writes a food guide only for cities without a curated one", async 
   assert.equal(trip.food?.[0].restaurants[0].price, 2);
   assert.equal(foodFor(trip, "Lisbon").source, "giro", "curated guide wins for Lisbon");
 });
+
+test("michelin: links to the guide's city page only where it has a selection", async () => {
+  const { michelinLink } = await import("../src/lib/booking.ts");
+  assert.equal(michelinLink("lisbon", "Lisbon"), "https://guide.michelin.com/en/restaurants?q=Lisbon");
+  assert.equal(michelinLink("new-york", "New York"), "https://guide.michelin.com/en/restaurants?q=New+York");
+  assert.equal(michelinLink("marrakech", "Marrakech"), undefined, "no Michelin selection there");
+  assert.equal(michelinLink(undefined, "Somewhere"), undefined);
+});

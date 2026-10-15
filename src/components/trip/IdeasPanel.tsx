@@ -13,6 +13,7 @@ import { loadTaste, recordSignal, setBlocked } from "@/lib/taste-client";
 import type { Interest, Trip } from "@/lib/types";
 import { CATEGORY_META, INTEREST_META } from "../meta";
 import { PlacePhoto } from "./PlacePhoto";
+import { StopDetails } from "./StopDetails";
 
 export const ideaDragId = (id: string) => `idea::${id}`;
 
@@ -82,14 +83,18 @@ function IdeaCard({ idea, trip, days, readOnly, onAdd, onDismiss, onBlock, loved
         <div className="min-w-0 flex-1">
           <p className="text-sm leading-snug font-semibold">{idea.title}</p>
           <p className="mt-0.5 text-xs text-muted">{[idea.area, `${idea.durationHrs}h`, idea.estCost ? money(trip, idea.estCost, true) : "Free"].filter(Boolean).join(" · ")}</p>
-          <a href={trackedHref(reviewsLink(idea.title, idea.city, tripFx(trip).currency), trip.id)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-ink-soft hover:text-ink">
-            <Star className="h-3 w-3" /> Reviews
-          </a>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <StopDetails activity={idea} city={idea.city} trip={trip} className="text-[11px]" />
+            <a href={trackedHref(reviewsLink(idea.title, idea.city, tripFx(trip).currency), trip.id)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-soft hover:text-ink">
+              <Star className="h-3 w-3" /> Reviews
+            </a>
+          </div>
           {loved && <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-900"><Users className="h-3 w-3" /> {lovedLabel(loved)}</p>}
           {idea.origin === "parked" && idea.reason && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"><ArchiveRestore className="h-3 w-3" /> {idea.reason}</p>
           )}
         </div>
+        {idea.category !== "free" && <PlacePhoto title={idea.title} city={idea.city} durationHrs={idea.durationHrs} className="h-14 w-16" rounded="rounded-lg" width={240} />}
         {idea.ref && !readOnly && (
           <button type="button" aria-label={`Never suggest ${idea.title} again`} title="Never suggest this again" onClick={() => onBlock(idea)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-sand hover:text-ink"><Ban className="h-3.5 w-3.5" /></button>
         )}

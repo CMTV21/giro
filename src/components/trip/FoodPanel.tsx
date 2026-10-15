@@ -1,8 +1,8 @@
 "use client";
 
-import { CalendarCheck, ExternalLink, MapPin, Plus, Sparkles, Star, Trophy, UtensilsCrossed } from "lucide-react";
+import { Award, CalendarCheck, ExternalLink, MapPin, Plus, Sparkles, Star, Trophy, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
-import { mapsSearchUrl, reserveLink, reviewsLink, topRestaurantsLink, trackedHref } from "@/lib/booking";
+import { mapsSearchUrl, michelinLink, reserveLink, reviewsLink, topRestaurantsLink, trackedHref } from "@/lib/booking";
 import { findDestination } from "@/lib/destinations";
 import { recalcBudget, newId } from "@/lib/curate";
 import { formatMoney } from "@/lib/currency";
@@ -26,6 +26,7 @@ export function FoodPanel({ trip, readOnly, onChange, onMessage }: { trip: Trip;
   const [city, setCity] = useState(cities[0]);
   const [meal, setMeal] = useState<Meal | "all">("all");
   const food = foodFor(trip, city);
+  const michelin = michelinLink(findDestination(city)?.slug, city);
   const fx = tripFx(trip);
   const days = trip.days.filter((d) => d.city === city);
   const restaurants = food.restaurants.filter((r) => meal === "all" || r.meal === meal);
@@ -64,7 +65,7 @@ export function FoodPanel({ trip, readOnly, onChange, onMessage }: { trip: Trip;
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {food.dishes.map((dish) => (
               <li key={dish.name} className="flex gap-3 rounded-2xl border border-line bg-surface p-3">
-                <PlacePhoto title={dish.wiki ?? dish.name} city={city} className="h-20 w-20" />
+                <PlacePhoto title={dish.wiki ?? dish.name} city={city} source="wiki" className="h-20 w-20" />
                 <div className="min-w-0">
                   <p className="font-semibold leading-snug">{dish.name}</p>
                   <p className="mt-1 text-sm leading-relaxed text-ink-soft">{dish.what}</p>
@@ -80,6 +81,7 @@ export function FoodPanel({ trip, readOnly, onChange, onMessage }: { trip: Trip;
           <h3 id="restaurants-title" className="flex items-center gap-2 text-lg font-semibold"><Trophy className="h-5 w-5 text-brand" /> Top restaurants</h3>
           <div className="flex flex-wrap gap-2">
             <a href={top} target="_blank" rel="noopener noreferrer" className="btn-ghost py-2 text-sm"><Star className="h-4 w-4" /> Live rankings on Tripadvisor <ExternalLink className="h-3.5 w-3.5" /></a>
+            {michelin && <a href={michelin} target="_blank" rel="noopener noreferrer" className="btn-ghost py-2 text-sm"><Award className="h-4 w-4" /> MICHELIN Guide picks <ExternalLink className="h-3.5 w-3.5" /></a>}
             <a href={mapsSearchUrl(`restaurants in ${city}`)} target="_blank" rel="noopener noreferrer" className="btn-ghost py-2 text-sm"><MapPin className="h-4 w-4" /> Nearby on Google Maps</a>
           </div>
         </div>

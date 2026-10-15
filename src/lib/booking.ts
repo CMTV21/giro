@@ -394,3 +394,19 @@ export function reserveLink(name: string, city: string, country: string | undefi
   }
   return { provider: "Google Maps", kind: "dining", label: `Reserve ${name}`, blurb: "Opens the restaurant on Google Maps, where its booking partner appears.", url: mapsSearchUrl(`${name}, ${city}`) };
 }
+
+/**
+ * Catalog cities with a MICHELIN Guide selection (checked October 2026). Marrakech, Cape Town,
+ * Sydney and Bali had none. There's no public Michelin API, so Giro links to the guide's own
+ * city page rather than copying its data.
+ */
+const MICHELIN_CITIES = new Set([
+  "paris", "tokyo", "kyoto", "lisbon", "rome", "barcelona", "london", "new-york", "mexico-city", "bangkok", "reykjavik",
+  "amsterdam", "dublin", "prague", "florence", "athens", "istanbul", "seoul", "singapore", "cancun", "vancouver", "montreal",
+]);
+
+/** The MICHELIN Guide's restaurant page for a city (its search redirects to the city listing), when it covers it. */
+export function michelinLink(slug: string | undefined, city: string): string | undefined {
+  if (!slug || !MICHELIN_CITIES.has(slug)) return undefined;
+  return withParams("https://guide.michelin.com/en/restaurants", { q: city });
+}

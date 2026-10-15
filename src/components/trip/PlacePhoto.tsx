@@ -2,16 +2,38 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PhotoCredit, PlaceInfo } from "@/lib/place-parse";
-import { placeInfo, type PlaceQuery } from "@/lib/places-client";
+import { googlePhotos, placeInfo, type GooglePhoto, type PlaceQuery } from "@/lib/places-client";
 
 /** "Photo: Jane Doe, CC BY-SA 4.0" linking to the Commons file page. */
 export function photoCredit(photo?: PhotoCredit): string {
   return ["Photo", [photo?.author, photo?.license].filter(Boolean).join(", ") || "Wikimedia Commons"].join(": ");
 }
 
+/** What's shown on a photo: the photographer, and where it came from. */
+interface Shown {
+  src: string;
+  alt: string;
+  href?: string;
+  credit: string;
+  title: string;
+}
+
+const fromGoogle = (g: GooglePhoto, alt: string): Shown => ({
+  src: g.src,
+  alt,
+  href: g.authorUrl,
+  credit: g.author ? `${g.author} · Google Maps` : "Google Maps",
+  title: g.author ? `Photo: ${g.author} (Google Maps)` : "Photo from Google Maps",
+});
+
+const fromWiki = (info: PlaceInfo, alt: string): Shown | undefined =>
+  info.thumbnail ? { src: info.thumbnail, alt: info.title ?? alt, href: info.photo?.page ?? info.url, credit: info.photo?.author ?? "Wikimedia Commons", title: photoCredit(info.photo) } : undefined;
+
 /**
  * A place's photo, fetched only when the element scrolls near the viewport so a long itinerary
- * doesn't fire dozens of lookups at once. Renders nothing when there's no free-licensed photo.
+ * doesn't fire dozens of lookups at once. Google's photo of the place comes first; Wikimedia
+ * Commons is the fallback (and the only source for `source="wiki"`, e.g. dishes). Renders nothing
+ * when neither has one.
  */
 export function PlacePhoto({
   title,
@@ -20,6 +42,8 @@ export function PlacePhoto({
   className = "h-20 w-24",
   rounded = "rounded-xl",
   durationHrs = 2,
+  source = "google",
+  width = 480,
 }: {
   title: string;
   city: string;
@@ -27,9 +51,12 @@ export function PlacePhoto({
   className?: string;
   rounded?: string;
   durationHrs?: number;
+  /** "wiki" skips Google, for things that aren't a single place (a dish, a neighbourhood). */
+  source?: "google" | "wiki";
+  width?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [info, setInfo] = useState<PlaceInfo>();
+  const [shown, setShown] = useState<Shown | null>();
   const [failed, setFailed] = useState(false);
   const strict = query?.strict;
 
@@ -37,7 +64,11 @@ export function PlacePhoto({
     const el = ref.current;
     if (!el) return;
     let live = true;
-    const load = () => placeInfo({ title, durationHrs }, city, { strict }).then((i) => live && setInfo(i));
+    const load = async () => {
+      const google = source === "google" ? (await googlePhotos(title, city, 1, width))[0] : undefined;
+      const next = google ? fromGoogle(google, title) : fromWiki(await placeInfo({ title, durationHrs }, city, { strict }), title);
+      if (live) setShown(next ?? null);
+    };
     if (typeof IntersectionObserver === "undefined") {
       load();
       return () => {
@@ -58,23 +89,29 @@ export function PlacePhoto({
       live = false;
       io.disconnect();
     };
-  }, [title, city, strict, durationHrs]);
+  }, [title, city, strict, durationHrs, source, width]);
 
-  const src = !failed ? info?.thumbnail : undefined;
   // Reserve no space until we know there's a photo, so text-only cards don't show empty boxes.
-  if (info && !src) return <div ref={ref} hidden />;
+  if (shown === null || failed) return <div ref={ref} hidden />;
   return (
-    <div ref={ref} className={`relative shrink-0 overflow-hidden bg-sand ${rounded} ${className} ${info ? "" : "animate-pulse"}`}>
-      {src && (
-        <a href={info!.photo?.page ?? info!.url} target="_blank" rel="noopener noreferrer" title={photoCredit(info!.photo)} className="block h-full w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={info!.title ?? title} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-cover" />
-          {/* Credit the photographer on the image itself (CC licences ask for attribution). */}
-          <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pt-3 pb-0.5 text-[9px] leading-tight text-white/90">
-            {info!.photo?.author ?? "Wikimedia Commons"}
-          </span>
-        </a>
-      )}
+    <div ref={ref} className={`relative shrink-0 overflow-hidden bg-sand ${rounded} ${className} ${shown ? "" : "animate-pulse"}`}>
+      {shown && <PhotoImage shown={shown} onError={() => setFailed(true)} />}
     </div>
+  );
+}
+
+/** The image with its credit on it (CC licences and Google both require attribution). */
+function PhotoImage({ shown, onError }: { shown: Shown; onError: () => void }) {
+  const img = (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={shown.src} alt={shown.alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onError} className="h-full w-full object-cover" />
+      <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-1.5 pt-3 pb-0.5 text-[9px] leading-tight text-white/90">{shown.credit}</span>
+    </>
+  );
+  return shown.href ? (
+    <a href={shown.href} target="_blank" rel="noopener noreferrer" title={shown.title} className="block h-full w-full">{img}</a>
+  ) : (
+    <span title={shown.title} className="block h-full w-full">{img}</span>
   );
 }

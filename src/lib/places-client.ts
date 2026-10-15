@@ -43,3 +43,28 @@ export function placeInfo(a: Pick<Activity, "title" | "durationHrs">, city: stri
   cache.set(q.facts ? `${base}|f` : base, promise);
   return promise;
 }
+
+export interface GooglePhoto {
+  /** Short-lived Google image URL (never stored). */
+  src: string;
+  author?: string;
+  authorUrl?: string;
+}
+
+const googleCache = new Map<string, Promise<GooglePhoto[]>>();
+
+/** Google photos of a place, once per page load. Empty when Google is off, unknown or over its monthly cap. */
+export function googlePhotos(title: string, city: string, count = 1, width = 480): Promise<GooglePhoto[]> {
+  const key = `${title}|${city}|${count}|${width}`;
+  const hit = googleCache.get(key);
+  if (hit) return hit;
+  const p = new URLSearchParams({ title, city, count: String(count), width: String(width) });
+  const promise = slot(() =>
+    fetch(`/api/place/photos?${p.toString()}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ photos?: GooglePhoto[] }>) : { photos: [] }))
+      .then((j) => j.photos ?? [])
+      .catch(() => [] as GooglePhoto[]),
+  );
+  googleCache.set(key, promise);
+  return promise;
+}

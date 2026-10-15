@@ -25,7 +25,7 @@ import { DayMapToggle } from "./DayMap";
 import { EventsCard } from "./EventsCard";
 import { FoodPanel } from "./FoodPanel";
 import { ItineraryBoard } from "./ItineraryBoard";
-import { PlaceFacts } from "./PlaceFacts";
+import { StopDetails } from "./StopDetails";
 import { Avatar, GroupPanel } from "./GroupPanel";
 import { LivePanel } from "./LivePanel";
 import { PackingPanel } from "./PackingPanel";
@@ -352,7 +352,7 @@ export function TripView() {
               onVote={shared ? vote : undefined}
               onChange={commit}
               onMessage={flash}
-              renderExtra={(a, city) => <PlaceFacts activity={a} city={city} />}
+              renderExtra={(a, city) => <StopDetails activity={a} city={city} trip={trip} className="mt-3" />}
               renderMap={(day, items) => <DayMapToggle trip={trip} day={day} items={items} />}
             />
           </div>

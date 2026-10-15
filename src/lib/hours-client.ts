@@ -19,7 +19,7 @@ export interface StopHours {
   mapsUrl?: string;
 }
 
-// Must match the server's hoursKey.
+// Must match the server's placeKey.
 const keyOf = (title: string, city: string) => `${normalizeCity(title)}|${normalizeCity(city)}`.slice(0, 240);
 
 /** Catalog sights and restaurants have hours worth checking; your own stops and placeholders don't. */
@@ -27,10 +27,18 @@ const checkable = (a: Activity) => Boolean(a.ref) && a.category !== "transit" &&
 
 const memo = new Map<string, PlaceHours>();
 
+/** Hours change and every check is a paid lookup, so only days from yesterday to two weeks out are checked. */
+export const HOURS_WINDOW_DAYS = 14;
+export function withinHoursWindow(date: string, now = new Date()): boolean {
+  const day = Date.parse(`${date}T12:00:00Z`);
+  const today = Date.parse(`${now.toISOString().slice(0, 10)}T12:00:00Z`);
+  return day >= today - 86_400_000 && day <= today + HOURS_WINDOW_DAYS * 86_400_000;
+}
+
 /** Opening hours for the trip's sights and restaurants (when the server has a Places key). */
 export function useOpeningHours(trip: Trip) {
   const [, setVersion] = useState(0);
-  const wanted = trip.days.flatMap((d) => d.activities.filter(checkable).map((a) => ({ title: a.title, city: d.city })));
+  const wanted = trip.days.filter((d) => withinHoursWindow(d.date)).flatMap((d) => d.activities.filter(checkable).map((a) => ({ title: a.title, city: d.city })));
   const missing = [...new Map(wanted.filter((w) => !memo.has(keyOf(w.title, w.city))).map((w) => [keyOf(w.title, w.city), w])).values()];
   const signature = missing.map((m) => keyOf(m.title, m.city)).join("|");
 
@@ -51,7 +59,7 @@ export function useOpeningHours(trip: Trip) {
   }, [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (a: Activity, day: Day, item?: Pick<ScheduledItem, "start" | "end">): StopHours | undefined => {
-    if (!checkable(a)) return undefined;
+    if (!checkable(a) || !withinHoursWindow(day.date)) return undefined;
     const found = memo.get(keyOf(a.title, day.city));
     if (!found?.hours) return undefined;
     const check = item ? checkHours(found.hours, day.date, item.start, item.end) : undefined;
