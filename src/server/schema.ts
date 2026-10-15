@@ -202,4 +202,23 @@ export const MIGRATIONS: string[][] = [
       primary key (provider, month)
     )`,
   ],
+  [
+    // Launch-experiment funnel: anonymous counts (trips planned, Pass page views, waitlist sign-ups).
+    // No IP address or account is stored with an event.
+    `create table funnel_events (
+      id bigint generated always as identity primary key,
+      kind text not null,
+      trip_id text,
+      detail jsonb,
+      at timestamptz not null default now()
+    )`,
+    `create index funnel_events_kind_idx on funnel_events(kind, at)`,
+    `create table pass_waitlist (
+      email text primary key,
+      user_id text references users(id) on delete set null,
+      trip_id text,
+      price_cad integer not null,
+      created_at timestamptz not null default now()
+    )`,
+  ],
 ];

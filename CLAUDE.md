@@ -53,4 +53,5 @@ Owner: GitHub cmtv21. Read README.md for the feature table and every environment
   traveller tips / "Publish your trip". Google Places is capped monthly (`GOOGLE_PLACES_MONTHLY_CAP`, default 900).
 - Strategy: market research in the owner's reports (AI trip planner competitive landscape). Positioning: group
   trips abroad for Canadians; per-trip "Group Trip Pass" pricing idea. 90-day plan with go/no-go metrics:
-  `docs/LAUNCH-90-DAY.md` (week-0 gaps: anonymous trip_planned counter, pass_events table).
+  `docs/LAUNCH-90-DAY.md`. Measurement is live: `/admin/launch` scorecard, `funnel_events` + `pass_waitlist`
+  tables (`src/server/funnel.ts`), Pass page `/pass` (price in `src/lib/pass.ts`). Set `LAUNCH_DATE` on Day 0.

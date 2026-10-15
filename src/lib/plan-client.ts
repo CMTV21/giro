@@ -2,6 +2,7 @@
 
 import { blankTrip, curateTrip } from "./curate";
 import { DEFAULT_CURRENCY, FALLBACK_AS_OF, FALLBACK_RATES, isCurrency, type Currency, type FxSnapshot, type PayCurrency } from "./currency";
+import { track } from "./funnel-client";
 import { saveTrip } from "./storage";
 import { loadTaste } from "./taste-client";
 import type { Trip, TripRequest } from "./types";
@@ -43,6 +44,13 @@ export async function paidToUsd(amount: number, currency: PayCurrency): Promise<
   return rate && rate > 0 ? Math.round((amount / rate) * 100) / 100 : undefined;
 }
 
+/** Anonymous shape of a newly planned trip, for the launch funnel (no destinations or notes). */
+function planned(trip: Trip, how: "ai" | "engine" | "blank"): Trip {
+  const r = trip.request;
+  track("planned", trip.id, { how, cities: r.destinations.length, days: trip.days.length, party: r.adults + r.children });
+  return trip;
+}
+
 /** Curate with Claude when requested and available; otherwise (or on failure) use the built-in engine. */
 export async function planTrip(req: TripRequest): Promise<{ trip: Trip; notice: PlanNotice }> {
   const [fx, taste] = [await getFx(req.currency), loadTaste()];
@@ -56,7 +64,7 @@ export async function planTrip(req: TripRequest): Promise<{ trip: Trip; notice: 
       });
       if (res.ok) {
         const { trip } = (await res.json()) as { trip: Trip };
-        return { trip: await saveTrip(trip), notice: undefined };
+        return { trip: planned(await saveTrip(trip), "ai"), notice: undefined };
       }
       notice = res.status === 503 ? "ai-unavailable" : "ai-failed";
     } catch {
@@ -64,11 +72,11 @@ export async function planTrip(req: TripRequest): Promise<{ trip: Trip; notice: 
     }
   }
   const trip = curateTrip({ ...req, useAI: false }, { fx, taste });
-  return { trip: await saveTrip(trip), notice };
+  return { trip: planned(await saveTrip(trip), "engine"), notice };
 }
 
 /** Start from scratch: the trip's structure with empty days to fill yourself. */
 export async function planBlank(req: TripRequest): Promise<Trip> {
   const fx = await getFx(req.currency);
-  return saveTrip(blankTrip(req, { fx }));
+  return planned(await saveTrip(blankTrip(req, { fx })), "blank");
 }

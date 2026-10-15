@@ -41,11 +41,14 @@ The group thesis rests on the **invite rate**. If it fails, the price doesn't ma
 
 ## Measurement
 
-Already in the database: `trips`, `trip_members`, `trip_invites`, `clicks` (with `trip_id`). Two gaps to close in week 0:
-1. **Trips planned while signed out** live only in the browser (`giro.trips.v1`), so the server never sees them. Add an anonymous `trip_planned` counter (date, city count, no personal data) so the funnel shows *planned → saved*.
-2. **Pass interest/sales:** a `pass_events` table (`trip_id`, `kind` = `viewed` | `waitlist` | `paid`, `price_cad`, `at`).
+**Live: `/admin/launch`** (admins only) shows all six metrics against the thresholds, with an "if we decided today" verdict. Set `LAUNCH_DATE` (YYYY-MM-DD) in Vercel on Day 0 so it counts from launch.
 
-Weekly scorecard (Neon SQL editor):
+Data behind it:
+- `trips`, `trip_members`, `trip_invites`, `clicks` (with `trip_id`).
+- `funnel_events`: anonymous events with no IP or account. `planned` comes from the planner for every new trip, signed in or not, with city/day/party counts. `pass_viewed` comes from `/pass`. `pass_waitlist` is recorded by the server, and `pass_paid` is reserved for week 9.
+- `pass_waitlist`: email (+ account and trip if signed in) and price shown. The Pass page is `/pass`, linked from the Group tab (owners) and the footer. The price is set in `src/lib/pass.ts`.
+
+Manual check (Neon SQL editor):
 
 ```sql
 -- trips, invite rate, acceptance, click-through since launch

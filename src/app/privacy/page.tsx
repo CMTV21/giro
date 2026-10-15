@@ -19,6 +19,8 @@ export default function PrivacyPage() {
         <li><strong>Group trips</strong>: who is on a trip and their role, votes on activities, and shared expenses (amount, description, who paid and who it&apos;s split between). These are visible to everyone on that trip.</li>
         <li><strong>Travel DNA</strong>: a taste profile derived from what you swap, remove, book and vote on. You can view and reset it on your account page.</li>
         <li><strong>Partner clicks</strong>: when you follow a booking link, we record which partner, the trip, an estimated trip value, the time, and your account if you&apos;re signed in. This is how we earn and reconcile commissions.</li>
+        <li><strong>Usage counts</strong>: when you plan a trip or open the Group Trip Pass page, we record an anonymous event: the trip&apos;s random ID, how many cities, days and travellers it has, and the time. We don&apos;t store your IP address, account or destinations with it. This is how we measure whether Giro is useful.</li>
+        <li><strong>Group Trip Pass waitlist</strong>: if you join it, your email address, plus your account and the trip you came from if you&apos;re signed in. We use it only to email you once when the Pass is ready.</li>
         <li><strong>Security data</strong>: your IP address, used to limit repeated sign-in, sign-up and reset attempts. These records are deleted within about a day.</li>
       </ul>
       <h3>When you don&apos;t sign in</h3>
@@ -65,6 +67,7 @@ export default function PrivacyPage() {
 
       <h2>7. How long we keep it</h2>
       <p>We keep your account information until you delete your account. Deleting it (Account → Delete account) permanently removes your profile, the trips you own (including for other members of those trips), your trip memberships, votes, expenses you paid, and sessions. Partner click records are kept for commission reconciliation, but are no longer linked to you. Our database provider may hold encrypted backups for a short period before they expire.</p>
+      <p>Group Trip Pass waitlist entries are deleted once we&apos;ve sent the launch email, or sooner if you ask us. Anonymous usage counts aren&apos;t linked to you, so they&apos;re kept.</p>
 
       <h2>8. Your choices and rights</h2>
       <ul>

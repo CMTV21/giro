@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowRight, Check, Copy, LoaderCircle, LogOut, Paperclip, Plus, ScanText, Trash2, UserMinus, Users, Wallet } from "lucide-react";
+import { ArrowRight, Check, Copy, LoaderCircle, LogOut, Paperclip, Plus, ScanText, Ticket, Trash2, UserMinus, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { checkAI } from "@/lib/plan-client";
 import { CURRENCIES, formatLocal, isCurrency, type Currency } from "@/lib/currency";
 import { tripFx } from "@/lib/money";
+import { PASS_PRICE_CAD } from "@/lib/pass";
 import { api, type TripBundle } from "@/lib/storage";
 import { useSession } from "../SessionProvider";
 import { shrinkImage } from "./BookingsPanel";
@@ -30,9 +31,19 @@ export function GroupPanel({ bundle, onChanged, onSaveToAccount, onLeft }: { bun
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-      <Members bundle={bundle} onChanged={onChanged} onLeft={onLeft} />
-      <Expenses bundle={bundle} onChanged={onChanged} />
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <Members bundle={bundle} onChanged={onChanged} onLeft={onLeft} />
+        <Expenses bundle={bundle} onChanged={onChanged} />
+      </div>
+      {bundle.role === "owner" && (
+        <Link href={`/pass?trip=${encodeURIComponent(tripId)}`} className="card flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 text-sm hover:ring-2 hover:ring-brand/30">
+          <Ticket className="h-4 w-4 shrink-0 text-brand" />
+          <span className="font-semibold">Group Trip Pass</span>
+          <span className="text-ink-soft">Unlimited travellers, voting, shared expenses and receipts for C${PASS_PRICE_CAD} per trip. Free while Giro is in beta.</span>
+          <span className="ml-auto inline-flex items-center gap-1 font-semibold text-brand">Learn more <ArrowRight className="h-4 w-4" /></span>
+        </Link>
+      )}
     </div>
   );
 }
